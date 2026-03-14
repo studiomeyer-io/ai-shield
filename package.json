@@ -1,8 +1,27 @@
 {
   "name": "ai-shield",
   "version": "0.1.0",
-  "private": true,
-  "description": "LLM Security Middleware — Prompt Injection, PII Protection, Cost Control, Audit Trail",
+  "description": "LLM Security for TypeScript — Prompt Injection Detection, PII Protection, Cost Control, Audit Trail",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/studiomeyer-io/ai-shield"
+  },
+  "homepage": "https://github.com/studiomeyer-io/ai-shield",
+  "bugs": {
+    "url": "https://github.com/studiomeyer-io/ai-shield/issues"
+  },
+  "keywords": [
+    "llm",
+    "security",
+    "prompt-injection",
+    "pii",
+    "ai",
+    "openai",
+    "anthropic",
+    "middleware",
+    "typescript",
+    "mcp"
+  ],
   "workspaces": [
     "packages/core",
     "packages/openai",

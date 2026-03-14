@@ -1,6 +1,6 @@
 # AI Shield
 
-LLM Security Middleware for TypeScript. Prompt injection detection, PII protection, tool policy enforcement, cost tracking, and audit logging — in one SDK.
+LLM Security for TypeScript. Zero dependencies. Prompt injection detection, PII protection, tool policy enforcement, cost tracking, and audit logging — in one SDK.
 
 ```
 npm install @ai-shield/core
@@ -770,14 +770,15 @@ Minimal by design. Core has zero runtime dependencies. Optional peer deps for Re
 
 ## Roadmap
 
+- [x] LRU scan cache (TTL + LRU eviction)
+- [x] Streaming support (OpenAI + Anthropic)
+- [x] Canary token detection
 - [ ] ONNX DeBERTa ML classifier (optional, <20ms)
 - [ ] LLM-as-Judge async verification
-- [ ] Streaming support (scan at sentence boundaries)
 - [ ] Bloom filter for known-good/bad inputs
-- [ ] LRU scan cache
-- [ ] PostgreSQL audit store implementation
+- [ ] PostgreSQL audit store (currently console fallback)
+- [ ] Toxicity / bias detection
 - [ ] Dashboard (Next.js)
-- [ ] npm publish
 
 ---
 
