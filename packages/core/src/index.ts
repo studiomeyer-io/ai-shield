@@ -71,7 +71,15 @@ export type {
 import { AIShield } from "./shield.js";
 import type { ShieldConfig, ScanResult, ScanContext } from "./types.js";
 
-/** Quick scan — one line, maximum protection */
+/**
+ * Quick scan — one line, maximum protection.
+ *
+ * **Performance warning:** This creates a new AIShield instance on every call.
+ * For production use with multiple calls, create a single `new AIShield(config)`
+ * instance and reuse it — this avoids repeated scanner chain setup and teardown.
+ *
+ * Use `createShieldSingleton()` for a cached version that reuses a single instance.
+ */
 export async function shield(
   input: string,
   configOrContext?: ShieldConfig | ScanContext,
@@ -88,4 +96,32 @@ export async function shield(
   } finally {
     await instance.close();
   }
+}
+
+/**
+ * Create a cached shield function that reuses a single AIShield instance.
+ * Much better performance than `shield()` for repeated calls.
+ *
+ * @example
+ * ```ts
+ * const scan = createShieldSingleton({ injection: { strictness: "high" } });
+ * const r1 = await scan("input 1");
+ * const r2 = await scan("input 2");
+ * // Call scan.close() when done (e.g., on process exit)
+ * await scan.close();
+ * ```
+ */
+export function createShieldSingleton(config: ShieldConfig = {}): {
+  (input: string, context?: ScanContext): Promise<ScanResult>;
+  close(): Promise<void>;
+} {
+  const instance = new AIShield(config);
+
+  const scan = (input: string, context?: ScanContext): Promise<ScanResult> => {
+    return instance.scan(input, context);
+  };
+
+  scan.close = (): Promise<void> => instance.close();
+
+  return scan;
 }

@@ -54,7 +54,7 @@ export interface ScanContext {
   agentId?: string;
   sessionId?: string;
   userId?: string;
-  userType?: "lead" | "agency" | "customer" | "internal";
+  userType?: string;
   locale?: string;
   preset?: PresetName;
   tools?: ToolCall[];
