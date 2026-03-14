@@ -740,7 +740,7 @@ ai-shield/
 ## Tests
 
 ```bash
-npm test            # 232 tests, <700ms
+npm test            # 303 tests, <1s
 ```
 
 | Suite | Tests | Covers |
