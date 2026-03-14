@@ -9,6 +9,7 @@ export {
   ShieldBudgetError,
   type ShieldedGeminiConfig,
   type GeminiContent,
+  type GenerateContentParams,
 } from "./wrapper.js";
 
 // Re-export core types for convenience

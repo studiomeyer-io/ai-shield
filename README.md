@@ -231,7 +231,9 @@ const shielded = createShield(model, {
 const stream = await shielded.generateContentStream("Tell me about your products");
 
 for await (const chunk of stream) {
-  process.stdout.write(chunk.text());
+  try {
+    process.stdout.write(chunk.text());
+  } catch { /* chunk may have no text */ }
 }
 
 console.log(stream.text);          // full accumulated response
@@ -794,28 +796,34 @@ ai-shield/
 ## Tests
 
 ```bash
-npm test            # 320 tests, <1s
+npm test            # 325 tests, <1s
 ```
 
 | Suite | Tests | Covers |
 |-------|------:|--------|
 | Heuristic | 42 | 23 injection prompts, 15 clean prompts, config, performance |
 | Cost | 26 | Budget checks, cost recording, pricing table, anomaly z-score |
+| LRU Cache | 20 | Get/set, LRU eviction, TTL expiry, prune, AIShield integration |
 | PII | 20 | IBAN, credit card, email, phone, tax ID, IP, URL, masking, modes |
+| PII Extended | 16 | Edge cases, overlap dedup, multi-type |
 | Policy Engine | 16 | All 3 presets, thresholds, PII actions, tool policies, budgets |
+| Heuristic Extended | 15 | Advanced patterns, structural signals, edge cases |
 | Scanner Chain | 15 | Execution, escalation, early-exit, sanitization, metadata |
+| Full Pipeline | 14 | End-to-end integration, preset combos |
 | Middleware | 13 | Input extraction (6 fields + messages[]), blocked response format |
 | Shield | 13 | Default config, presets, tool policy, cost, convenience, metadata |
 | Audit | 13 | Logging, SHA-256 hashing, batching, flush, close |
+| Gemini Wrapper | 12 | Clean input (string, array, params), injection blocking, PII masking, callbacks, output scan, tool context |
 | Tool Policy | 12 | Allow/deny, wildcards, manifest pin/drift, performance |
+| OpenAI Stream | 10 | Chunk accumulation, pre-stream blocking, cost recording, done/text props |
+| Middleware Express | 10 | Express integration, error handling, skip paths |
 | OpenAI Wrapper | 9 | Clean input, injection blocking, PII masking, callbacks, output scan |
 | Anthropic Stream | 9 | Chunk accumulation, pre-stream blocking, cost recording, output scan |
-| OpenAI Stream | 10 | Chunk accumulation, pre-stream blocking, cost recording, done/text props |
-| LRU Cache | 20 | Get/set, LRU eviction, TTL expiry, prune, AIShield integration |
+| Middleware Hono | 8 | Hono integration, context injection |
+| Singleton | 8 | Instance management, config reuse |
 | Canary | 7 | Token injection, uniqueness, leak detection |
-| Gemini Wrapper | 12 | Clean input (string, array, params), injection blocking, PII masking, callbacks, output scan, tool context |
-| Gemini Stream | 5 | Chunk accumulation, pre-stream blocking, output scan, shieldResult, response promise |
 | Anthropic Wrapper | 7 | Clean input, injection blocking, PII masking, multi-block, output scan |
+| Gemini Stream | 10 | Chunk accumulation, pre-stream blocking, output scan, shieldResult, response promise, done state, onBlocked callback, modelName config |
 
 ---
 
@@ -840,6 +848,7 @@ Minimal by design. Core has zero runtime dependencies. Optional peer deps for Re
 - [x] LRU scan cache (TTL + LRU eviction)
 - [x] Streaming support (OpenAI + Anthropic + Gemini)
 - [x] Canary token detection
+- [ ] `@google/genai` wrapper (new Gemini SDK, replacing `@google/generative-ai`)
 - [ ] ONNX DeBERTa ML classifier (optional, <20ms)
 - [ ] LLM-as-Judge async verification
 - [ ] Bloom filter for known-good/bad inputs

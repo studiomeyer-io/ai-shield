@@ -21,6 +21,8 @@ export interface ShieldedGeminiConfig {
   onBlocked?: (result: ScanResult, content: GeminiContent[]) => void;
   /** Callback when input has warnings */
   onWarning?: (result: ScanResult, content: GeminiContent[]) => void;
+  /** Model name for cost tracking (default: "gemini-pro"). Set this to match your model, e.g. "gemini-1.5-pro", "gemini-2.0-flash" */
+  modelName?: string;
 }
 
 // --- Gemini SDK types (minimal, duck-typed to avoid hard dependency) ---
@@ -66,7 +68,7 @@ interface GeminiTool {
   functionDeclarations?: Array<{ name: string; description?: string }>;
 }
 
-interface GenerateContentParams {
+export interface GenerateContentParams {
   contents: GeminiContent[];
   tools?: GeminiTool[];
   [key: string]: unknown;
@@ -207,7 +209,7 @@ export class ShieldedGemini {
     if (this.config.agentId) {
       const estimate = await shieldInstance.checkBudget(
         this.config.agentId,
-        "gemini-pro", // Gemini SDK doesn't expose model name in params
+        this.config.modelName ?? "gemini-pro", // Gemini SDK doesn't expose model name in params
         userContent.length * 0.75, // rough token estimate
       );
       if (!estimate.allowed) {
@@ -236,7 +238,7 @@ export class ShieldedGemini {
       const usage = result.response.usageMetadata;
       await shieldInstance.recordCost(
         this.config.agentId,
-        "gemini-pro",
+        this.config.modelName ?? "gemini-pro",
         usage.promptTokenCount ?? 0,
         usage.candidatesTokenCount ?? 0,
       );
@@ -279,6 +281,7 @@ export class ShieldedGemini {
       context,
       this.config.scanOutput ?? false,
       this.config.agentId,
+      this.config.modelName ?? "gemini-pro",
     );
   }
 
@@ -313,7 +316,10 @@ export class ShieldedGemini {
 
   /** Graceful shutdown */
   async close(): Promise<void> {
-    if (this.shield) {
+    if (this._shieldReady) {
+      const shield = await this._shieldReady;
+      await shield.close();
+    } else if (this.shield) {
       await this.shield.close();
     }
   }
@@ -335,6 +341,7 @@ export class ShieldedGeminiStream implements AsyncIterable<GeminiResponse> {
   private _context: ScanContext;
   private _scanOutput: boolean;
   private _agentId: string | undefined;
+  private _modelName: string;
 
   constructor(
     stream: AsyncGenerator<GeminiResponse>,
@@ -344,6 +351,7 @@ export class ShieldedGeminiStream implements AsyncIterable<GeminiResponse> {
     context: ScanContext,
     scanOutput: boolean,
     agentId: string | undefined,
+    modelName: string,
   ) {
     this._stream = stream;
     this._responsePromise = responsePromise;
@@ -352,6 +360,7 @@ export class ShieldedGeminiStream implements AsyncIterable<GeminiResponse> {
     this._context = context;
     this._scanOutput = scanOutput;
     this._agentId = agentId;
+    this._modelName = modelName;
   }
 
   async *[Symbol.asyncIterator](): AsyncGenerator<GeminiResponse> {
@@ -376,7 +385,7 @@ export class ShieldedGeminiStream implements AsyncIterable<GeminiResponse> {
         const usage = finalResponse.usageMetadata;
         await this._shieldInstance.recordCost(
           this._agentId,
-          "gemini-pro",
+          this._modelName,
           usage.promptTokenCount ?? 0,
           usage.candidatesTokenCount ?? 0,
         );
