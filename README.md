@@ -1,6 +1,21 @@
+<div align="center">
+
 # AI Shield
 
-LLM Security for TypeScript. Zero dependencies. Prompt injection detection, PII protection, tool policy enforcement, cost tracking, and audit logging — in one SDK.
+**LLM security for TypeScript. Zero dependencies.**
+
+[![npm version](https://img.shields.io/npm/v/ai-shield-core?color=blue)](https://www.npmjs.com/package/ai-shield-core)
+[![npm downloads](https://img.shields.io/npm/dw/ai-shield-core)](https://www.npmjs.com/package/ai-shield-core)
+[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
+[![TypeScript](https://img.shields.io/badge/TypeScript-strict-blue.svg)](tsconfig.json)
+[![Zero Dependencies](https://img.shields.io/badge/dependencies-0-brightgreen.svg)](package.json)
+[![Tests: 325 passing](https://img.shields.io/badge/tests-325%20passing-brightgreen.svg)](tests/)
+
+Prompt injection detection · PII protection · Tool policy enforcement · Cost tracking · Audit logging
+
+[Quick Start](#quick-start) · [Injection Detection](#prompt-injection-detection) · [PII](#pii-detection) · [Tool Policy](#tool-policy) · [Presets](#policy-presets) · [Cost](#cost-tracking) · [Roadmap](#roadmap)
+
+</div>
 
 ```
 npm install ai-shield-core
@@ -526,7 +541,7 @@ if (!result.valid) {
 Three presets for common deployment scenarios.
 
 | Preset | Injection Threshold | PII Action | Dangerous Tools | Daily Budget |
-|--------|-------------------|------------|-----------------|--------------|
+|--------|-------------------|------------|-----------------|------------|
 | `public_website` | 0.25 (strictest) | mask (block CC/IBAN) | delete, remove, admin, execute, payment, write, create, update | $10 |
 | `internal_support` | 0.35 | mask all | delete, remove, admin, payment | $50 |
 | `ops_agent` | 0.50 (relaxed) | mask (allow email/phone) | drop, destroy, wipe, shutdown | $100 |
@@ -583,7 +598,7 @@ const tracker = new CostTracker(budgets, redis);
 Built-in pricing table (Feb 2026):
 
 | Model | Input/1M | Output/1M |
-|-------|----------|-----------|
+|-------|----------|----------|
 | GPT-5.2 | $2.50 | $10.00 |
 | GPT-4o | $2.50 | $10.00 |
 | GPT-4o-mini | $0.15 | $0.60 |
@@ -832,7 +847,7 @@ npm test            # 325 tests, <1s
 Minimal by design. Core has zero runtime dependencies. Optional peer deps for Redis and PostgreSQL.
 
 | Package | Required | Purpose |
-|---------|----------|---------|
+|---------|----------|--------|
 | `ioredis` | No | Distributed budget tracking |
 | `pg` | No | PostgreSQL audit logging |
 | `openai` | Peer dep of `ai-shield-openai` | OpenAI SDK wrapper |
@@ -861,3 +876,13 @@ Minimal by design. Core has zero runtime dependencies. Optional peer deps for Re
 ## License
 
 MIT
+
+---
+
+<div align="center">
+
+Built by [StudioMeyer](https://studiomeyer.io)
+
+[Darwin Agents](https://github.com/studiomeyer-io/darwin-agents) · [Agent Fleet](https://github.com/studiomeyer-io/agent-fleet) · [MCP Video](https://github.com/studiomeyer-io/mcp-video)
+
+</div>
