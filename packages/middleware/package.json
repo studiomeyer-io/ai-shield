@@ -1,6 +1,7 @@
 {
   "name": "ai-shield-middleware",
   "version": "0.1.0",
+  "license": "MIT",
   "description": "AI Shield middleware for Express and Hono — route-level LLM protection",
   "type": "module",
   "main": "./dist/index.js",

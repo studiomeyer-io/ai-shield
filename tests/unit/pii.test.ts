@@ -45,7 +45,7 @@ describe("PIIScanner", () => {
 
   describe("detects email", () => {
     it("detects standard email", () => {
-      const entities = scanner.detect("Contact: matthias@studiomeyer.io");
+      const entities = scanner.detect("Contact: user@example.com");
       expect(entities).toHaveLength(1);
       expect(entities[0]!.type).toBe("email");
     });
@@ -85,7 +85,7 @@ describe("PIIScanner", () => {
 
   describe("detects IP addresses", () => {
     it("detects public IP", () => {
-      const entities = scanner.detect("Server: 46.225.14.141");
+      const entities = scanner.detect("Server: 203.0.113.42");
       expect(entities).toHaveLength(1);
       expect(entities[0]!.type).toBe("ip_address");
     });
@@ -107,12 +107,12 @@ describe("PIIScanner", () => {
   describe("masking", () => {
     it("masks PII in text", async () => {
       const result = await scanner.scan(
-        "Kontakt: matthias@studiomeyer.io, Tel +49 171 1234567, IBAN DE89 3704 0044 0532 0130 00",
+        "Kontakt: user@example.com, Tel +49 171 1234567, IBAN DE89 3704 0044 0532 0130 00",
         {},
       );
-      expect(result.sanitized).not.toContain("matthias@studiomeyer.io");
+      expect(result.sanitized).not.toContain("user@example.com");
       expect(result.sanitized).not.toContain("DE89 3704 0044 0532 0130 00");
-      expect(result.sanitized).toContain("m***@studiomeyer.io");
+      expect(result.sanitized).toContain("u***@example.com");
     });
 
     it("returns warn decision for masked content", async () => {

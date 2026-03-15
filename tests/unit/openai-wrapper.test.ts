@@ -107,12 +107,12 @@ describe("ShieldedOpenAI", () => {
 
       await shielded.createChatCompletion({
         model: "gpt-4o",
-        messages: [{ role: "user", content: "My email is matthias@studiomeyer.io" }],
+        messages: [{ role: "user", content: "My email is user@example.com" }],
       });
 
       const msgs = capturedMessages as Array<{ role: string; content: string }>;
-      expect(msgs[0]!.content).not.toContain("matthias@studiomeyer.io");
-      expect(msgs[0]!.content).toContain("m***@studiomeyer.io");
+      expect(msgs[0]!.content).not.toContain("user@example.com");
+      expect(msgs[0]!.content).toContain("u***@example.com");
 
       await shielded.close();
     });

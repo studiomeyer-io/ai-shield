@@ -20,6 +20,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **LRU Cache** — Scan result caching with TTL (default 5min, max 1000 entries)
 - **OpenAI Wrapper** (`ai-shield-openai`) — Drop-in replacement with pre/post scanning, streaming support
 - **Anthropic Wrapper** (`ai-shield-anthropic`) — Drop-in replacement with pre/post scanning, streaming support
+- **Gemini Wrapper** (`ai-shield-gemini`) — Drop-in replacement for Google Gemini SDK with pre/post scanning, streaming support
 - **Middleware** (`ai-shield-middleware`) — Express and Hono route-level protection
 - **3 Policy Presets** — `public_website`, `internal_support`, `ops_agent`
-- **232 tests** across 15 test files, all passing
+- **325 tests** across 23 test files, all passing

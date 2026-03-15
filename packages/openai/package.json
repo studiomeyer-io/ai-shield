@@ -1,6 +1,7 @@
 {
   "name": "ai-shield-openai",
   "version": "0.1.0",
+  "license": "MIT",
   "description": "AI Shield wrapper for OpenAI SDK — automatic input/output scanning",
   "type": "module",
   "main": "./dist/index.js",

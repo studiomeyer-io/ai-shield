@@ -158,11 +158,11 @@ describe("ShieldedGemini", () => {
         }),
       });
 
-      await shielded.generateContent("My email is matthias@studiomeyer.io");
+      await shielded.generateContent("My email is user@example.com");
 
       const req = capturedRequest as { contents: Array<{ parts: Array<{ text: string }> }> };
-      expect(req.contents[0]!.parts[0]!.text).not.toContain("matthias@studiomeyer.io");
-      expect(req.contents[0]!.parts[0]!.text).toContain("m***@studiomeyer.io");
+      expect(req.contents[0]!.parts[0]!.text).not.toContain("user@example.com");
+      expect(req.contents[0]!.parts[0]!.text).toContain("u***@example.com");
 
       await shielded.close();
     });

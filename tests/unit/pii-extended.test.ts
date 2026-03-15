@@ -6,10 +6,10 @@ describe("PIIScanner Extended", () => {
 
   describe("IP address detection", () => {
     it("detects public IP addresses", () => {
-      const entities = scanner.detect("Server at 46.225.14.141");
+      const entities = scanner.detect("Server at 203.0.113.42");
       expect(entities).toHaveLength(1);
       expect(entities[0]!.type).toBe("ip_address");
-      expect(entities[0]!.value).toBe("46.225.14.141");
+      expect(entities[0]!.value).toBe("203.0.113.42");
     });
 
     it("detects another public IP", () => {

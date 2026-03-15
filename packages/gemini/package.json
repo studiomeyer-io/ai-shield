@@ -1,6 +1,7 @@
 {
   "name": "ai-shield-gemini",
   "version": "0.1.0",
+  "license": "MIT",
   "description": "AI Shield wrapper for Google Gemini SDK — automatic input/output scanning",
   "type": "module",
   "main": "./dist/index.js",

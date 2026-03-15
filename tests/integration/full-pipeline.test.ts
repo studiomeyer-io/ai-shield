@@ -31,10 +31,10 @@ describe("Full Pipeline Integration", () => {
 
   it("PII in input → warn/mask with sanitized text", async () => {
     instance = new AIShield({ injection: { enabled: false } });
-    const result = await instance.scan("Contact me at matthias@studiomeyer.io please");
+    const result = await instance.scan("Contact me at user@example.com please");
     expect(result.decision).toBe("warn");
-    expect(result.sanitized).not.toContain("matthias@studiomeyer.io");
-    expect(result.sanitized).toContain("m***@studiomeyer.io");
+    expect(result.sanitized).not.toContain("user@example.com");
+    expect(result.sanitized).toContain("u***@example.com");
     expect(result.violations.some((v) => v.type === "pii_detected")).toBe(true);
   });
 

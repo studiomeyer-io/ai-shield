@@ -1,6 +1,7 @@
 {
   "name": "ai-shield-anthropic",
   "version": "0.1.0",
+  "license": "MIT",
   "description": "AI Shield wrapper for Anthropic SDK — automatic input/output scanning",
   "type": "module",
   "main": "./dist/index.js",

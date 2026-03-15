@@ -28,7 +28,7 @@ tests/         — All test files (vitest)
 ### Commands
 
 ```bash
-npm test                    # Run all 232 tests
+npm test                    # Run all 325 tests
 npm run build               # Build all packages
 npm run typecheck            # TypeScript strict check
 npx vitest run tests/unit/heuristic.test.ts  # Single test file

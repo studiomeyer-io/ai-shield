@@ -83,12 +83,12 @@ describe("ShieldedAnthropic", () => {
       await shielded.createMessage({
         model: "claude-sonnet-4-6",
         max_tokens: 1024,
-        messages: [{ role: "user", content: "My email is matthias@studiomeyer.io" }],
+        messages: [{ role: "user", content: "My email is user@example.com" }],
       });
 
       const msgs = capturedMessages as Array<{ role: string; content: string }>;
-      expect(msgs[0]!.content).not.toContain("matthias@studiomeyer.io");
-      expect(msgs[0]!.content).toContain("m***@studiomeyer.io");
+      expect(msgs[0]!.content).not.toContain("user@example.com");
+      expect(msgs[0]!.content).toContain("u***@example.com");
 
       await shielded.close();
     });
