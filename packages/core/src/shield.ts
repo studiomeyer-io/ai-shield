@@ -48,6 +48,16 @@ export class AIShield {
 
   /** Scan input text — the main API */
   async scan(input: string, context: ScanContext = {}): Promise<ScanResult> {
+    // Input-length guard — without this a user-supplied multi-MB prompt would
+    // trigger every regex scan on the full buffer, which is O(n) best-case
+    // but pathological under ReDoS-prone patterns. 256 KB handles every
+    // real chat/tool input we care about with plenty of headroom; override
+    // via AI_SHIELD_MAX_INPUT_BYTES when needed.
+    const maxInputBytes = Number(process.env.AI_SHIELD_MAX_INPUT_BYTES ?? 262_144);
+    if (input.length > maxInputBytes) {
+      input = input.slice(0, maxInputBytes);
+    }
+
     // Apply preset if not set in context
     if (!context.preset) {
       context.preset = this.config.preset ?? "public_website";

@@ -62,11 +62,16 @@ const PII_PATTERNS: PIIPattern[] = [
     baseConfidence: 0.95,
   },
 
-  // Phone: German formats (+49, 0xxx) and international
+  // Phone: German formats (+49, 0xxx) and international.
+  // Previous pattern had nested optional quantifiers (`\s?[\s\-/]?` plus two
+  // `[\s\-/]?\d{0,5}` tails) which risks catastrophic backtracking on
+  // malformed inputs. Restructured so every separator group requires at least
+  // one char when present and the trailing digits group is a true non-optional
+  // extension (or absent entirely).
   {
     type: "phone",
     pattern:
-      /(?<!\d)(?:\+\d{1,3}|00\d{1,3}|0)\s?[\s\-/]?\(?\d{2,5}\)?[\s\-/]?\d{3,8}[\s\-/]?\d{0,5}\b/g,
+      /(?<!\d)(?:\+\d{1,3}|00\d{1,3}|0)[\s\-/]?\(?\d{2,5}\)?[\s\-/]?\d{3,8}(?:[\s\-/]\d{1,5})?\b/g,
     validator: validatePhone,
     baseConfidence: 0.80,
   },
