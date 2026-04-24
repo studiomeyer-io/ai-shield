@@ -49,17 +49,32 @@ class MemoryStore implements RedisLike {
   }
 }
 
+export interface CostTrackerOptions {
+  /**
+   * Cap on in-memory CostRecord retention (ring-buffer).
+   * Default: 10_000. Set to 0 to disable record retention entirely
+   * (use this in long-running processes that only care about budget
+   * counters, not per-request records).
+   * Override via env: AI_SHIELD_MAX_RECORDS.
+   */
+  maxRecords?: number;
+}
+
 export class CostTracker {
   private store: RedisLike;
   private budgets: Map<string, BudgetConfig>;
   private records: CostRecord[] = [];
+  private maxRecords: number;
 
   constructor(
     budgets: Record<string, BudgetConfig> = {},
     redis?: RedisLike,
+    options: CostTrackerOptions = {},
   ) {
     this.store = redis ?? new MemoryStore();
     this.budgets = new Map(Object.entries(budgets));
+    const envCap = Number(process.env.AI_SHIELD_MAX_RECORDS);
+    this.maxRecords = options.maxRecords ?? (Number.isFinite(envCap) && envCap >= 0 ? envCap : 10_000);
   }
 
   /** Check if a request is within budget BEFORE sending to LLM */
@@ -133,8 +148,27 @@ export class CostTracker {
       await this.store.expire(globalKey, this.periodSeconds(globalBudget.period) * 2);
     }
 
-    this.records.push(record);
+    this.appendRecord(record);
     return record;
+  }
+
+  /**
+   * Append a record with ring-buffer semantics to prevent unbounded memory growth.
+   * When maxRecords is 0, records are not retained.
+   */
+  private appendRecord(record: CostRecord): void {
+    if (this.maxRecords === 0) return;
+    this.records.push(record);
+    if (this.records.length > this.maxRecords) {
+      // Drop oldest entries — O(1) amortized using splice(0, overflow)
+      const overflow = this.records.length - this.maxRecords;
+      this.records.splice(0, overflow);
+    }
+  }
+
+  /** Clear all in-memory records (e.g., after export) */
+  clearRecords(): void {
+    this.records.length = 0;
   }
 
   /** Get current spend for an entity */

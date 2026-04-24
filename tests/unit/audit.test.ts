@@ -58,7 +58,7 @@ describe("AuditLogger", () => {
       const record = store.records[0]!;
       expect(record.userIdHash).toBeDefined();
       expect(record.userIdHash).not.toContain("user-123");
-      expect(record.userIdHash!.length).toBe(16); // truncated hash
+      expect(record.userIdHash!.length).toBe(32); // 128-bit truncated SHA-256 (collision-resistant to ~2^64)
     });
 
     it("stores agent ID and session ID", async () => {

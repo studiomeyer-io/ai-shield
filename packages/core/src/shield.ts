@@ -80,8 +80,11 @@ export class AIShield {
       this.scanCache.set(cacheKey, result);
     }
 
-    // Log to audit if enabled
-    if (this.auditLogger) {
+    // Log to audit if enabled — but never double-log the same input when
+    // a downstream caller re-scans cached content (result.meta.cached is set
+    // by the cache hit path above; here it is always false but we guard to
+    // be explicit and so subclasses extending scan() stay safe).
+    if (this.auditLogger && !result.meta.cached) {
       void this.auditLogger.log(input, result, context);
     }
 

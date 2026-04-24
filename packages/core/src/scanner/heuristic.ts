@@ -3,7 +3,47 @@ import type { Scanner, ScannerResult, ScanContext, Violation } from "../types.js
 // ============================================================
 // Heuristic Prompt Injection Scanner
 // Score-based: multiple matches = higher confidence
+// Unicode-normalizes input before pattern matching so that
+// homoglyph/zero-width/fullwidth evasion attempts still hit.
 // ============================================================
+
+// Common Cyrillic/Greek Latin-lookalikes mapped to ASCII.
+// Keep minimal — false-mappings in real content are worse than
+// false-negatives in an attack attempt.
+const HOMOGLYPH_MAP: Record<string, string> = {
+  "а": "a", "е": "e", "і": "i", "ј": "j", "о": "o", "р": "p", "с": "c", "ѕ": "s",
+  "у": "y", "х": "x", "А": "A", "В": "B", "Е": "E", "І": "I", "К": "K", "М": "M",
+  "Н": "H", "О": "O", "Р": "P", "С": "C", "Т": "T", "Х": "X",
+  "α": "a", "ο": "o", "ρ": "p", "ε": "e", "υ": "y", "χ": "x", "Α": "A", "Β": "B",
+  "Ε": "E", "Ζ": "Z", "Η": "H", "Ι": "I", "Κ": "K", "Μ": "M", "Ν": "N", "Ο": "O",
+  "Ρ": "P", "Τ": "T", "Υ": "Y", "Χ": "X",
+};
+
+const HOMOGLYPH_RE = new RegExp(Object.keys(HOMOGLYPH_MAP).join("|"), "g");
+// Zero-width chars + BOM — used to split words like "ig<ZWSP>nore" across
+// the pattern boundary (U+200B..U+200D, U+2060, U+FEFF).
+const ZERO_WIDTH_RE = /[​-‍⁠﻿]/g;
+// Combining marks (diacritics) after NFKC can still slip through (U+0300..U+036F).
+const COMBINING_RE = /[̀-ͯ]/g;
+
+/**
+ * Normalize input for pattern matching. Returns the canonicalized string
+ * used only for scan decisions; the sanitized output passed to callers
+ * is still the original input.
+ *
+ * Order matters:
+ * 1. NFKD folds compatibility forms (fullwidth → ASCII, ligatures) AND
+ *    decomposes precomposed accented letters into base + combining mark.
+ * 2. Strip zero-width chars so "ig<ZWSP>nore" collapses to "ignore".
+ * 3. Strip combining marks (diacritics) left behind by NFKD.
+ * 4. Map remaining Cyrillic/Greek look-alikes to Latin.
+ */
+export function normalizeForInjectionScan(input: string): string {
+  const nfkd = input.normalize("NFKD");
+  const noZW = nfkd.replace(ZERO_WIDTH_RE, "");
+  const noCombining = noZW.replace(COMBINING_RE, "");
+  return noCombining.replace(HOMOGLYPH_RE, (ch) => HOMOGLYPH_MAP[ch] ?? ch);
+}
 
 interface PatternRule {
   id: string;
@@ -357,8 +397,13 @@ export class HeuristicScanner implements Scanner {
     const violations: Violation[] = [];
     let totalScore = 0;
 
+    // Normalize once — pattern matching runs against the canonical form so
+    // homoglyph/zero-width evasion doesn't bypass the rules. The caller
+    // still sees the original input in `sanitized`.
+    const normalized = normalizeForInjectionScan(input);
+
     for (const rule of this.patterns) {
-      if (rule.pattern.test(input)) {
+      if (rule.pattern.test(normalized)) {
         totalScore += rule.weight;
         violations.push({
           type: "prompt_injection",
@@ -371,7 +416,9 @@ export class HeuristicScanner implements Scanner {
       }
     }
 
-    // Structural signals (cumulative)
+    // Structural signals (cumulative) — intentionally run on the original
+    // input so real structural attacks (many newlines, long paddings) can
+    // still trip even when the textual patterns were evaded.
     const structuralScore = this.checkStructuralSignals(input);
     totalScore += structuralScore;
 

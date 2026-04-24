@@ -24,10 +24,13 @@ interface PIIPattern {
 
 // --- German & International PII Patterns ---
 const PII_PATTERNS: PIIPattern[] = [
-  // IBAN: DE + 2 check digits + 18 digits (with optional spaces/dashes)
+  // IBAN: 2-letter ISO + 2 check digits + 11..30 alphanumerics (with optional spaces/dashes).
+  // Covers all 80+ IBAN countries: NO (15), BE (16), DE (22), FR (27), MT (31), SC (31).
+  // The validator runs mod-97 over the cleaned value and rejects anything that isn't a real IBAN.
+  // Pattern is linear (no nested quantifiers) — ReDoS-safe.
   {
     type: "iban",
-    pattern: /\b[A-Z]{2}\s?\d{2}\s?\d{4}\s?\d{4}\s?\d{4}\s?\d{4}\s?\d{2,4}\b/g,
+    pattern: /\b[A-Z]{2}\d{2}[ -]?[A-Z0-9](?:[A-Z0-9 -]{9,36}[A-Z0-9])?\b/g,
     validator: validateIBAN,
     baseConfidence: 0.95,
   },
@@ -166,11 +169,17 @@ function maskValue(type: PIIType, value: string): string {
       return value[0] + "***@" + value.substring(atIdx + 1);
     }
     case "phone":
+      // Need room for 4-prefix + ****  + 2-suffix without overlap.
+      if (value.length < 7) return "[PHONE]";
       return value.substring(0, 4) + "****" + value.substring(value.length - 2);
     case "iban":
-      return value.substring(0, 4) + " **** **** ****";
-    case "credit_card":
-      return "**** **** **** " + value.replace(/\D/g, "").substring(12);
+      // Keep country code + check digits, mask rest. Works for any IBAN length.
+      return value.length >= 4 ? value.substring(0, 4) + " **** **** ****" : "[IBAN]";
+    case "credit_card": {
+      const digits = value.replace(/\D/g, "");
+      if (digits.length < 13) return "[CREDIT_CARD]";
+      return "**** **** **** " + digits.substring(digits.length - 4);
+    }
     default:
       return `[${type.toUpperCase()}]`;
   }

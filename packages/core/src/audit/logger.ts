@@ -28,6 +28,11 @@ export class AuditLogger {
     this.flushTimer = setInterval(() => {
       void this.flush();
     }, flushMs);
+    // Allow the Node process to exit even if the timer is pending —
+    // clean shutdown should go through close(), not rely on the timer.
+    if (typeof this.flushTimer.unref === "function") {
+      this.flushTimer.unref();
+    }
   }
 
   /** Log a scan result */
@@ -48,7 +53,7 @@ export class AuditLogger {
       sessionId: context.sessionId,
       agentId: context.agentId,
       userIdHash: context.userId
-        ? createHash("sha256").update(context.userId).digest("hex").substring(0, 16)
+        ? createHash("sha256").update(context.userId).digest("hex").substring(0, 32)
         : undefined,
       requestType: context.tools?.length ? "tool_call" : "chat",
       inputHash: createHash("sha256").update(input).digest("hex"),
