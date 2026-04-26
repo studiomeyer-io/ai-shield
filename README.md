@@ -55,6 +55,49 @@ AI Shield runs in-process (not as a proxy), adds <25ms latency, and works with a
 
 ---
 
+## What AI Shield is NOT (architectural honesty)
+
+Pattern-based input filters belong to a class of defenses that recent research has shown to be **insufficient on their own** against prompt injection — particularly indirect injection through tool outputs, retrieved documents, or scraped web content.
+
+**Read the paper:** [Parallax: Why AI Agents That Think Must Never Act](https://arxiv.org/abs/2604.12986) (Joel Fokou, April 2026). The core argument: any defense that operates inside the same reasoning system that processes the attack — including system prompts, in-context guardrails, fine-tuned safety, and yes, regex pre-filters — shares the same attention substrate as the malicious instruction. OpenAI's own [Model Spec](https://model-spec.openai.com/) acknowledges this: language models do not have a reliable mechanism to distinguish instructions from data.
+
+**What this means for AI Shield users:**
+
+- **The Heuristic Scanner blocks known attack patterns.** It will not catch a novel obfuscation, a polymorphic phrasing, a foreign-language paraphrase, or an attack hidden inside a long document the agent is asked to summarize.
+- **Indirect injection is the bigger risk.** Over 55% of prompt injection incidents observed in 2026 enterprise deployments arrive through trusted-looking data channels (scraped pages, PDFs, tool outputs, agent-to-agent messages) — not the user prompt. AI Shield scans the user input. It does not deeply inspect every retrieved document the agent ingests downstream.
+- **Multi-agent contagion is real.** When one agent's output becomes another agent's input, a successful injection propagates. AI Shield does not enforce trust boundaries between cooperating agents.
+
+### What is actually defensible
+
+The only architecturally robust defense against prompt injection is **privilege separation** — the LLM proposes actions, an external deterministic system validates and executes them. The reasoning surface is allowed to be untrusted; the action surface is not.
+
+Inside AI Shield, the parts of the library that align with this model are:
+
+| Feature | Why it survives Parallax-class analysis |
+|---------|------------------------------------------|
+| **Tool Policy Scanner** | Pure deterministic gate. The LLM cannot call a denied tool no matter what reasoning it produces. This is the closest thing in this library to a real capability boundary. |
+| **Manifest Pinning** | Detects supply-chain drift (added/removed tools) without trusting any model output. |
+| **Cost / Budget Enforcement** | External counter, not an instruction the LLM can override. |
+| **Canary Tokens** | Detection signal — flags that an attack succeeded, even if it didn't prevent it. |
+| **Audit Logging** | Forensic. Lets you reconstruct what happened after the fact. |
+
+The parts of AI Shield that follow the *language-level* defense model — Heuristic Scanner, PII pre-scan, output filters in the streaming wrappers — are useful **as a first line of triage** (cheap, fast, blocks the obvious 40+ patterns) but should never be the only line. Treat them like a spam filter, not a firewall.
+
+### Recommendation
+
+If you ship AI agents with real-world side effects (database writes, payments, email sends, file system access, network calls), the architecture you actually need is:
+
+1. **A Reasoning LLM** (untrusted boundary) that produces structured tool calls.
+2. **A deterministic Capability Layer** outside the LLM that:
+   - validates every tool call against a per-agent whitelist (use AI Shield's `ToolPolicyScanner`),
+   - re-derives every parameter that controls money, identity, or destruction from a trusted source — never from LLM output (e.g. price from your database, not from the model),
+   - requires explicit human confirmation for destructive or high-value actions when the input chain has touched untrusted data.
+3. **Per-tenant isolation** of memory, tools, and credentials — so that one compromised agent cannot fan out across your customer base.
+
+AI Shield is a useful *component* of that architecture. It is not, by itself, that architecture.
+
+---
+
 ## Architecture
 
 ```
