@@ -23,7 +23,7 @@
     "ai-shield-core": "0.1.0"
   },
   "devDependencies": {
-    "openai": "^4.77.0",
+    "openai": "^6.35.0",
     "typescript": "^5.7.0"
   }
 }
