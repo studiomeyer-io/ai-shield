@@ -32,11 +32,12 @@
     "packages/middleware"
   ],
   "scripts": {
-    "build": "npm run build --workspaces",
-    "typecheck": "npm run typecheck --workspaces",
+    "build": "tsc -b",
+    "typecheck": "tsc -b",
+    "pretest": "tsc -b",
     "test": "vitest run",
     "test:watch": "vitest",
-    "clean": "rm -rf packages/*/dist"
+    "clean": "tsc -b --clean && rm -rf packages/*/dist packages/*/*.tsbuildinfo"
   },
   "devDependencies": {
     "typescript": "^5.7.0",
