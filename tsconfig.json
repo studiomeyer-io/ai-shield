@@ -4,8 +4,6 @@
     "module": "NodeNext",
     "moduleResolution": "NodeNext",
     "lib": ["ES2022"],
-    "outDir": "dist",
-    "rootDir": ".",
     "strict": true,
     "esModuleInterop": true,
     "skipLibCheck": true,
@@ -16,7 +14,15 @@
     "sourceMap": true,
     "noUncheckedIndexedAccess": true,
     "noUnusedLocals": true,
-    "noUnusedParameters": true
+    "noUnusedParameters": true,
+    "disableSourceOfProjectReferenceRedirect": true
   },
-  "exclude": ["node_modules", "dist", "tests"]
+  "files": [],
+  "references": [
+    { "path": "packages/core" },
+    { "path": "packages/openai" },
+    { "path": "packages/anthropic" },
+    { "path": "packages/gemini" },
+    { "path": "packages/middleware" }
+  ]
 }

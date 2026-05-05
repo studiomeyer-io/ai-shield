@@ -13,8 +13,8 @@
     }
   },
   "scripts": {
-    "build": "tsc",
-    "typecheck": "tsc --noEmit"
+    "build": "tsc -b",
+    "typecheck": "tsc -b"
   },
   "peerDependencies": {
     "openai": ">=4.0.0"
