@@ -23,7 +23,7 @@
     "ai-shield-core": "0.1.0"
   },
   "devDependencies": {
-    "@google/generative-ai": "^0.21.0",
+    "@google/generative-ai": "^0.24.1",
     "typescript": "^5.7.0"
   }
 }
