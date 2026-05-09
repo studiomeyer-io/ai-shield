@@ -6,7 +6,12 @@
 
 # AI Shield
 
-**LLM security for TypeScript. Zero dependencies.**
+
+<!-- badges -->
+![License](https://img.shields.io/github/license/studiomeyer-io/ai-shield?style=flat-square&color=22c55e&label=license)
+![Last commit](https://img.shields.io/github/last-commit/studiomeyer-io/ai-shield?style=flat-square&color=88c0d0&label=updated)
+![GitHub stars](https://img.shields.io/github/stars/studiomeyer-io/ai-shield?style=flat-square&color=ffd700&logo=github&label=stars)
+<!-- /badges -->**LLM security for TypeScript. Zero dependencies.**
 
 [![npm version](https://img.shields.io/npm/v/ai-shield-core?color=blue)](https://www.npmjs.com/package/ai-shield-core)
 [![npm downloads](https://img.shields.io/npm/dw/ai-shield-core)](https://www.npmjs.com/package/ai-shield-core)
