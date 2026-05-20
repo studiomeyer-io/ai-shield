@@ -26,7 +26,7 @@ https://crew.studiomeyer.io/mcp
 
 | Project | Description | Install |
 |---------|-------------|---------|
-| **[AI Shield](https://github.com/studiomeyer-io/ai-shield)** | LLM security — prompt injection, PII, cost tracking, tool policies | `npm install ai-shield-core` |
+| **[AI Shield](https://github.com/studiomeyer-io/ai-shield)** | LLM security toolkit — prompt injection + indirect injection (RAG / tool-desc / memory / web) + PII + memory canary + circuit breakers + cost tracking. Zero-dep core, optional ONNX classifier. | `npm install ai-shield-core` |
 | **[Darwin Agents](https://github.com/studiomeyer-io/darwin-agents)** | Self-evolving AI agents with A/B testing and safety gates | `npm install darwin-agents` |
 | **[Agent Fleet](https://github.com/studiomeyer-io/agent-fleet)** | Multi-agent orchestration for Claude Code CLI | `git clone` + `npm install` |
 | **[MCP Video](https://github.com/studiomeyer-io/mcp-video)** | Cinema-grade video production via MCP (FFmpeg + Playwright) | `npx mcp-video` |
@@ -43,9 +43,21 @@ Install all 4 MCP products as Claude Code plugins with one command:
 
 ## How AI Shield fits in
 
-AI Shield secures the input layer for any AI application — including the MCP servers above. Use it as middleware in your own agents, or as a standalone scanner for user-facing chatbots.
+AI Shield secures the entire input boundary of any AI application — including the MCP servers above. The v0.2 release covers both the direct user channel and the indirect channels (retrieved documents, MCP tool descriptions, stored memory, scraped web content, agent-to-agent messages) that account for >55% of 2026 prompt-injection incidents per Lakera's enterprise catalog.
 
-Typical integration: User input → **AI Shield scan** → MCP tool call → LLM response.
+Typical integration:
+
+```
+User input        ─┐
+RAG documents     ─┼─ wrapContext → scanWrappedContext → assemblePrompt → LLM
+MCP tool descs    ─┘                                          │
+                                                              ▼
+                                                       Tool call → CircuitBreakerRegistry
+                                                              │  (rate limit, blast radius, HITL)
+                                                              ▼
+                                                       Memory write → mintMemoryCanary
+                                                       Memory read  → verifyMemoryCanary
+```
 
 ## License
 

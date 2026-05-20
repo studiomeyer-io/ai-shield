@@ -23,6 +23,7 @@
     { "path": "packages/openai" },
     { "path": "packages/anthropic" },
     { "path": "packages/gemini" },
-    { "path": "packages/middleware" }
+    { "path": "packages/middleware" },
+    { "path": "packages/classifier-onnx" }
   ]
 }

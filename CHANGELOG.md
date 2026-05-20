@@ -5,6 +5,104 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.2.0] — Indirect-Injection + Trust-Tier + Memory Canary + Circuit Breakers (2026-05-20)
+
+The 2026 prompt-injection literature converges on one finding: regex over
+user input only addresses the smaller half of the threat. The dominant attack
+class is **indirect injection** — payloads arriving through RAG documents,
+MCP tool descriptions, stored memory, scraped web content, or another agent's
+output. v0.2 closes that gap and adds runtime defense for tool calls.
+
+No breaking changes. All v0.1 APIs continue to work unchanged.
+
+### Added
+
+- **`scanIngested(content, source)` + `IngestionScanner`** — Indirect-injection
+  scanner with per-source profiles (`rag` / `tool-desc` / `memory` / `web` /
+  `agent-output`). Each source carries a tighter threshold than the user
+  channel and a dedicated extra-pattern set: HTML-comment hidden
+  instructions, CSS-hidden text, "AI assistant note:" trojan headers,
+  "before using this tool you must…", memory-sentinel rewrites,
+  markdown-link hijacks, multi-agent contagion patterns. Reuses the
+  existing Unicode-evasion normalisation so homoglyph / zero-width /
+  full-width attacks land regardless of the channel.
+- **`wrapContext()` + `scanWrappedContext()` + `assemblePrompt()`** — Trust-tier
+  context streams. Build a `WrappedContext` from typed inputs (`system`,
+  `user`, `retrieved`, `tools`, `memory`, `web`, `agentOutput`), scan every
+  segment with the source-specific profile, and assemble a final prompt
+  where untrusted segments are wrapped in `<UNTRUSTED_CONTENT source="…">`
+  fences and blocked segments can be dropped via `strictMode: true`.
+  Each segment carries a `contentHash` (SHA-256) for downstream
+  poisoning detection.
+- **`mintMemoryCanary()` / `verifyMemoryCanary()` / `rotateMemoryCanary()` /
+  `buildSentinelEntry()` / `bulkVerify()`** — Persistence-poisoning detection
+  for memory stores. Seals each write with a random sentinel + SHA-256 hash
+  over `(id, content, token, tenantId)` so silent mutation surfaces as
+  `content_mutated` / `tenant_mismatch` / `hash_mismatch`. Constant-time
+  hex compare via `crypto.timingSafeEqual`. Sentinel-entry honeypots for
+  periodic store sweeps. Cross-tenant leaks surface as `tenant_mismatch`
+  rather than ordinary drift.
+- **`CircuitBreakerRegistry`** — Runtime tool guard layered on top of the
+  static `ToolPolicyScanner`. Per-(tool, scope) rolling-window rate limits,
+  blast-radius cap (max destructive calls per window), trip-and-cooldown
+  on accumulated failures, plus an `onDestructive` human-in-the-loop hook
+  that auto-denies on exception. LRU eviction on `(tool, scope)` cardinality
+  so an attacker can't blow up memory by exploding key space. Default cap
+  5_000 keys, overridable via `AI_SHIELD_CIRCUIT_MAX_KEYS`. Accepts any
+  `ioredis`-shaped `CounterStoreLike` for cross-replica state.
+- **`ai-shield-classifier-onnx` (new package, optional)** — ONNX-runtime ML
+  classifier as a sibling workspace. Implements the `Scanner` interface so
+  it composes cleanly into a `ScannerChain` after the heuristic regex pass.
+  Dependency-injected `OnnxInferenceRuntime` + `Tokenizer` keep the package
+  hermetic and unit-testable; `loadOnnxClassifier()` dynamically imports
+  `onnxruntime-node` only when actually called. Graceful-degrade on
+  inference error (returns `allow` + synthetic violation rather than blocking
+  traffic). Calibrated default threshold 0.85 for
+  `protectai/deberta-v3-base-prompt-injection`-class models. Kept out of
+  `ai-shield-core` to preserve the zero-dependency promise.
+
+### Changed
+
+- **`ScanContext` extended** with optional `source: IngestionSource` and
+  `trustTier: TrustTier` fields. Default `source: "user"` so existing callers
+  see identical behaviour. The ingestion scanner reads these to select the
+  source-specific profile.
+- **`ViolationType` extended** with five new categories
+  (`ingested_injection`, `untrusted_instruction`, `memory_poisoning`,
+  `circuit_breaker_open`, `blast_radius_exceeded`). Old callers that
+  switch on the type union should add cases — the existing cases still
+  match.
+- **Public exports** from `ai-shield-core` now include the new APIs above
+  plus their associated types (`IngestionSource`, `TrustTier`,
+  `ContextSegment`, `WrappedContext`, `MemoryCanaryEntry`,
+  `MemoryCanaryVerification`, `CircuitState`, `CircuitBreakerConfig`,
+  `CircuitBreakerDecision`, `CounterStoreLike`).
+
+### Tests
+
+- **+242 tests** across new suites: ingestion (48), wrap-context (31),
+  memory-canary (44), circuit-breaker (40), onnx-classifier (31, hermetic
+  with mock runtime + tokenizer), v0.2 defense-in-depth integration (20).
+- **567 / 567 green**, full suite under 1 s. Zero `tsc` errors across all
+  six workspaces.
+
+### Migration
+
+No code changes required. To engage v0.2 defenses:
+
+```ts
+// Before passing retrieved chunks into the model context:
+import { scanIngested } from "ai-shield-core";
+const r = await scanIngested(chunk, "rag");
+if (!r.safe) drop(chunk);
+
+// For full pipeline:
+import { wrapContext, scanWrappedContext, assemblePrompt } from "ai-shield-core";
+const ctx = wrapContext({ system, user, retrieved, tools, memory });
+await scanWrappedContext(ctx);
+const prompt = assemblePrompt(ctx, { strictMode: true });
+```
+
 ## [Unreleased] — Round-4 OSS-Sweep (2026-04-24)
 
 Triple-agent review (Analyst + Critic + Research) surfaced three classes of

@@ -1,6 +1,6 @@
 {
   "name": "ai-shield",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "LLM Security for TypeScript — Prompt Injection Detection, PII Protection, Cost Control, Audit Trail",
   "author": "StudioMeyer <hello@studiomeyer.io>",
   "repository": {
@@ -29,7 +29,8 @@
     "packages/openai",
     "packages/anthropic",
     "packages/gemini",
-    "packages/middleware"
+    "packages/middleware",
+    "packages/classifier-onnx"
   ],
   "scripts": {
     "build": "tsc -b",

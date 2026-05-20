@@ -10,10 +10,42 @@ export { HeuristicScanner, type HeuristicConfig } from "./scanner/heuristic.js";
 export { PIIScanner } from "./scanner/pii.js";
 export { ScannerChain, type ChainConfig } from "./scanner/chain.js";
 export { injectCanary, checkCanaryLeak } from "./scanner/canary.js";
+export {
+  IngestionScanner,
+  scanIngested,
+  trustTierForSource,
+  type IngestionScannerConfig,
+  type IngestionScanResult,
+} from "./scanner/ingestion.js";
+
+// Context / Trust-Tier
+export {
+  wrapContext,
+  scanWrappedContext,
+  assemblePrompt,
+  flattenViolations,
+  type WrapContextInput,
+  type AssembleOptions,
+} from "./context/wrap-context.js";
+
+// Memory Canary / Persistence-Poisoning
+export {
+  mintMemoryCanary,
+  verifyMemoryCanary,
+  rotateMemoryCanary,
+  buildSentinelEntry,
+  bulkVerify,
+  type MintMemoryCanaryOptions,
+} from "./canary/memory.js";
 
 // Policy
 export { PolicyEngine, type PolicyPreset } from "./policy/engine.js";
 export { ToolPolicyScanner } from "./policy/tools.js";
+export {
+  CircuitBreakerRegistry,
+  makeBreakerScope,
+  type CircuitBreakerOptions,
+} from "./policy/circuit-breaker.js";
 
 // Cost
 export { CostTracker, type RedisLike } from "./cost/tracker.js";
@@ -37,6 +69,19 @@ export type {
   ScanContext,
   Violation,
   ViolationType,
+  // Ingestion / Trust-Tier (v0.2)
+  IngestionSource,
+  TrustTier,
+  ContextSegment,
+  WrappedContext,
+  // Memory Canary (v0.2)
+  MemoryCanaryEntry,
+  MemoryCanaryVerification,
+  // Circuit Breaker (v0.2)
+  CircuitState,
+  CircuitBreakerConfig,
+  CircuitBreakerDecision,
+  CounterStoreLike,
   // PII
   PIIType,
   PIIAction,

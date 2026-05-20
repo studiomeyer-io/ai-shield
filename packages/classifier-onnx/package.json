@@ -1,0 +1,53 @@
+{
+  "name": "ai-shield-classifier-onnx",
+  "version": "0.2.0",
+  "license": "MIT",
+  "description": "Optional ONNX ML classifier for ai-shield — DeBERTa-style prompt-injection detection alongside heuristic patterns",
+  "author": "StudioMeyer <hello@studiomeyer.io>",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/studiomeyer-io/ai-shield",
+    "directory": "packages/classifier-onnx"
+  },
+  "homepage": "https://github.com/studiomeyer-io/ai-shield/tree/main/packages/classifier-onnx",
+  "bugs": {
+    "url": "https://github.com/studiomeyer-io/ai-shield/issues"
+  },
+  "keywords": [
+    "llm",
+    "security",
+    "prompt-injection",
+    "onnx",
+    "deberta",
+    "ml",
+    "classifier",
+    "ai-shield"
+  ],
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "scripts": {
+    "build": "tsc -b",
+    "typecheck": "tsc -b"
+  },
+  "peerDependencies": {
+    "ai-shield-core": "0.2.0",
+    "onnxruntime-node": ">=1.17.0"
+  },
+  "peerDependenciesMeta": {
+    "onnxruntime-node": { "optional": true }
+  },
+  "devDependencies": {
+    "ai-shield-core": "0.2.0",
+    "typescript": "^5.7.0"
+  },
+  "engines": {
+    "node": ">=20.0.0"
+  }
+}
