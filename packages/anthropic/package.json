@@ -23,7 +23,7 @@
     "ai-shield-core": "0.2.0"
   },
   "devDependencies": {
-    "@anthropic-ai/sdk": "^0.96.0",
+    "@anthropic-ai/sdk": "^0.98.0",
     "typescript": "^5.7.0"
   }
 }
