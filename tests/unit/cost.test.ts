@@ -123,9 +123,15 @@ describe("Model Pricing", () => {
     });
 
     it("returns Claude Opus pricing", () => {
-      const pricing = getModelPricing("claude-opus-4-6");
-      expect(pricing.inputPer1M).toBe(15.0);
-      expect(pricing.outputPer1M).toBe(75.0);
+      const pricing = getModelPricing("claude-opus-4-8");
+      expect(pricing.inputPer1M).toBe(5.0);
+      expect(pricing.outputPer1M).toBe(25.0);
+    });
+
+    it("returns Claude Fable 5 pricing", () => {
+      const pricing = getModelPricing("claude-fable-5");
+      expect(pricing.inputPer1M).toBe(10.0);
+      expect(pricing.outputPer1M).toBe(50.0);
     });
 
     it("returns alias pricing", () => {
@@ -166,6 +172,8 @@ describe("Model Pricing", () => {
     });
 
     it("has Anthropic models", () => {
+      expect(MODEL_PRICING["claude-fable-5"]).toBeDefined();
+      expect(MODEL_PRICING["claude-opus-4-8"]).toBeDefined();
       expect(MODEL_PRICING["claude-opus-4-6"]).toBeDefined();
       expect(MODEL_PRICING["claude-sonnet-4-6"]).toBeDefined();
       expect(MODEL_PRICING["claude-haiku-4-5"]).toBeDefined();

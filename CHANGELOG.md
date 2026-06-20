@@ -5,6 +5,20 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Fixed
+
+- **Model pricing table corrected and refreshed (June 2026).** The Anthropic
+  rows still carried the pre-4.7 Opus rate of `$15 / $75` per 1M tokens — Opus
+  has been `$5 / $25` since the 4.7 generation (with the 1M context window at
+  standard pricing, no long-context premium), so `estimateCost()` was
+  **over-estimating Opus spend by ~3x**. Corrected Opus 4.6/4.7 to `$5 / $25`,
+  added `claude-opus-4-8` and `claude-fable-5` (`$10 / $50`), fixed Haiku 4.5
+  to `$1 / $5`, and repointed the `opus` / `sonnet` / `haiku` aliases plus a new
+  `fable` alias. `cachedInputPer1M` recomputed at the ~10% cache-read rate
+  throughout.
+
 ## [0.2.0] — Indirect-Injection + Trust-Tier + Memory Canary + Circuit Breakers (2026-05-20)
 
 The 2026 prompt-injection literature converges on one finding: regex over
@@ -103,10 +117,13 @@ await scanWrappedContext(ctx);
 const prompt = assemblePrompt(ctx, { strictMode: true });
 ```
 
-## [Unreleased] — Round-4 OSS-Sweep (2026-04-24)
+## [0.1.1] — Round-4 OSS-Sweep (2026-04-24)
+
+> Shipped as part of the 0.2.0 npm release (these fixes predate the 0.2.0
+> feature work but were never cut as a standalone 0.1.1 tag).
 
 Triple-agent review (Analyst + Critic + Research) surfaced three classes of
-pre-release defects. Fixes land here before a tagged release.
+pre-release defects.
 
 ### Security
 

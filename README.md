@@ -828,7 +828,7 @@ const tracker = new CostTracker(budgets, redis);
 
 ### Model Pricing
 
-Built-in pricing table (Feb 2026):
+Built-in pricing table (Jun 2026):
 
 | Model | Input/1M | Output/1M |
 |-------|----------|----------|
@@ -836,9 +836,11 @@ Built-in pricing table (Feb 2026):
 | GPT-4o | $2.50 | $10.00 |
 | GPT-4o-mini | $0.15 | $0.60 |
 | o3 | $10.00 | $40.00 |
-| Claude Opus 4.6 | $15.00 | $75.00 |
+| Claude Fable 5 | $10.00 | $50.00 |
+| Claude Opus 4.8 | $5.00 | $25.00 |
+| Claude Opus 4.7 | $5.00 | $25.00 |
 | Claude Sonnet 4.6 | $3.00 | $15.00 |
-| Claude Haiku 4.5 | $0.80 | $4.00 |
+| Claude Haiku 4.5 | $1.00 | $5.00 |
 
 ### Anomaly Detection
 
