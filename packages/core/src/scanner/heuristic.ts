@@ -250,9 +250,13 @@ const PATTERNS: PatternRule[] = [
     description: "Spanish instruction override",
   },
   {
+    // "ignore" + "instructions" are identical in English and French, so the
+    // shared verb path requires a French determiner (les/tes/mes) to avoid
+    // double-firing on English "ignore previous instructions" (which INJ-001
+    // already covers). French-only verbs match the object noun directly.
     id: "INJ-FR-1",
     category: "localized_override",
-    pattern: /\b(?:ignore|oublie|neglige|ne\s+tiens?\s+pas\s+compte\s+de|fais\s+abstraction\s+de)\b[\s\S]{0,40}?\b(?:toutes?\s+)?(?:les?\s+|tes\s+|mes\s+)?(?:instructions?|consignes?|directives?|regles?|ordres?)\s*(?:precedentes?|anterieures?|au-dessus|ci-dessus)?/i,
+    pattern: /\b(?:ignore\s+(?:toutes?\s+)?(?:les|tes|mes)\s+(?:instructions?|consignes?|directives?|regles?|ordres?)|(?:oublie|neglige|fais\s+abstraction\s+de|ne\s+tiens?\s+pas\s+compte\s+des?)\s+(?:toutes?\s+)?(?:les?\s+|tes\s+|mes\s+)?(?:instructions?|consignes?|directives?|regles?|ordres?))/i,
     weight: 0.30,
     description: "French instruction override",
   },
