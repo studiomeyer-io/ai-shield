@@ -1,4 +1,11 @@
-import type { AIShield, ShieldConfig, ScanContext, ScanResult } from "ai-shield-core";
+import type {
+  AIShield,
+  ShieldConfig,
+  ScanContext,
+  ScanResult,
+  OutputScanConfig,
+  OutputScanResult,
+} from "ai-shield-core";
 
 // ============================================================
 // Google Gemini Shield Wrapper — Drop-in replacement
@@ -15,8 +22,19 @@ export interface ShieldedGeminiConfig {
   agentId?: string;
   /** Custom scan context factory */
   contextFactory?: (content: GeminiContent[]) => ScanContext;
-  /** Whether to scan output (response) too — default: false */
+  /**
+   * Legacy: run the INPUT scan chain (heuristic + PII) over the output too.
+   * Default false. For real output-side defense (secret leak, SQL/XSS/shell
+   * injection, system-prompt leak) use `outputScan` below (OWASP LLM05).
+   */
   scanOutput?: boolean;
+  /**
+   * Run the dedicated output scanner over the response (OWASP LLM05 / LLM02):
+   * secret leak, output injection, system-prompt leak, jailbreak, output-side
+   * PII. Pass `true` for defaults or an `OutputScanConfig`. Result lands in
+   * `result._shield.outputScan`.
+   */
+  outputScan?: boolean | OutputScanConfig;
   /** Callback when input is blocked */
   onBlocked?: (result: ScanResult, content: GeminiContent[]) => void;
   /** Callback when input has warnings */
@@ -223,10 +241,29 @@ export class ShieldedGemini {
     return { shieldInstance, context, userContent, inputResult, finalParams };
   }
 
+  /** Run the dedicated OutputScanner if `outputScan` is configured. */
+  private async runOutputScan(
+    text: string,
+    context: ScanContext,
+  ): Promise<OutputScanResult | undefined> {
+    if (!this.config.outputScan || !text) return undefined;
+    const cfg = this.config.outputScan === true ? {} : this.config.outputScan;
+    const mod = await import("ai-shield-core");
+    return mod.scanOutput(text, cfg, context);
+  }
+
   /** Generate content with Shield protection (non-streaming) */
   async generateContent(
     request: GenerateContentParams | string | Array<string | GeminiPart>,
-  ): Promise<GeminiResult & { _shield?: { input: ScanResult; output?: ScanResult } }> {
+  ): Promise<
+    GeminiResult & {
+      _shield?: {
+        input: ScanResult;
+        output?: ScanResult;
+        outputScan?: OutputScanResult;
+      };
+    }
+  > {
     const { shieldInstance, context, inputResult, finalParams } =
       await this.scanInput(request);
 
@@ -245,21 +282,22 @@ export class ShieldedGemini {
     }
 
     // --- Scan output ---
-    let outputResult: ScanResult | undefined;
-    if (this.config.scanOutput) {
-      try {
-        const outputText = result.response.text();
-        if (outputText) {
-          outputResult = await shieldInstance.scan(outputText, context);
-        }
-      } catch {
-        // text() throws if response was blocked — ignore
-      }
+    // text() throws if the response was blocked — guard once and reuse.
+    let outputText = "";
+    try {
+      outputText = result.response.text();
+    } catch {
+      // blocked / no text candidate — leave empty
     }
+    let outputResult: ScanResult | undefined;
+    if (this.config.scanOutput && outputText) {
+      outputResult = await shieldInstance.scan(outputText, context);
+    }
+    const outputScan = await this.runOutputScan(outputText, context);
 
     return {
       ...result,
-      _shield: { input: inputResult, output: outputResult },
+      _shield: { input: inputResult, output: outputResult, outputScan },
     };
   }
 
@@ -282,6 +320,7 @@ export class ShieldedGemini {
       this.config.scanOutput ?? false,
       this.config.agentId,
       this.config.modelName ?? "gemini-pro",
+      this.config.outputScan,
     );
   }
 
@@ -333,6 +372,7 @@ export class ShieldedGemini {
 export class ShieldedGeminiStream implements AsyncIterable<GeminiResponse> {
   private _inputResult: ScanResult;
   private _outputResult: ScanResult | undefined;
+  private _outputScanResult: OutputScanResult | undefined;
   private _done = false;
   private _fullText = "";
   private _stream: AsyncGenerator<GeminiResponse>;
@@ -340,6 +380,7 @@ export class ShieldedGeminiStream implements AsyncIterable<GeminiResponse> {
   private _shieldInstance: AIShield;
   private _context: ScanContext;
   private _scanOutput: boolean;
+  private _outputScan: boolean | OutputScanConfig | undefined;
   private _agentId: string | undefined;
   private _modelName: string;
 
@@ -352,6 +393,7 @@ export class ShieldedGeminiStream implements AsyncIterable<GeminiResponse> {
     scanOutput: boolean,
     agentId: string | undefined,
     modelName: string,
+    outputScan?: boolean | OutputScanConfig,
   ) {
     this._stream = stream;
     this._responsePromise = responsePromise;
@@ -359,6 +401,7 @@ export class ShieldedGeminiStream implements AsyncIterable<GeminiResponse> {
     this._shieldInstance = shieldInstance;
     this._context = context;
     this._scanOutput = scanOutput;
+    this._outputScan = outputScan;
     this._agentId = agentId;
     this._modelName = modelName;
   }
@@ -401,6 +444,15 @@ export class ShieldedGeminiStream implements AsyncIterable<GeminiResponse> {
         this._context,
       );
     }
+    if (this._outputScan && this._fullText) {
+      const cfg = this._outputScan === true ? {} : this._outputScan;
+      const mod = await import("ai-shield-core");
+      this._outputScanResult = await mod.scanOutput(
+        this._fullText,
+        cfg,
+        this._context,
+      );
+    }
 
     this._done = true;
   }
@@ -410,14 +462,27 @@ export class ShieldedGeminiStream implements AsyncIterable<GeminiResponse> {
     return this._inputResult;
   }
 
-  /** Output scan result (available after stream completes) */
+  /** Output scan result (legacy input-chain over output; after stream completes) */
   get outputResult(): ScanResult | undefined {
     return this._outputResult;
   }
 
+  /** Dedicated OutputScanner result (after stream completes, if `outputScan` set) */
+  get outputScanResult(): OutputScanResult | undefined {
+    return this._outputScanResult;
+  }
+
   /** Combined shield results */
-  get shieldResult(): { input: ScanResult; output?: ScanResult } {
-    return { input: this._inputResult, output: this._outputResult };
+  get shieldResult(): {
+    input: ScanResult;
+    output?: ScanResult;
+    outputScan?: OutputScanResult;
+  } {
+    return {
+      input: this._inputResult,
+      output: this._outputResult,
+      outputScan: this._outputScanResult,
+    };
   }
 
   /** Whether the stream has completed */

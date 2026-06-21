@@ -632,6 +632,8 @@ render(r.sanitized);      // PII masked, secrets redacted to [REDACTED_SECRET]
 
 High-confidence checks (secrets, injection, canary leak) block; jailbreak and heuristic system-prompt-leak warn. Length-capped at 256 KB and ReDoS-safe.
 
+**In the SDK wrappers:** pass `outputScan: true` (or an `OutputScanConfig`) to `ShieldedAnthropic` / `ShieldedOpenAI` / the Gemini wrapper to run this scanner over every model response automatically — the result lands on `response._shield.outputScan` (and `stream.outputScanResult` for streaming). This is distinct from the legacy `scanOutput: boolean` flag, which only runs the input chain over the output.
+
 ## Tool-Output Scanning (v0.3)
 
 The dominant indirect-injection channel in agentic loops is the *result* a tool returns — a search tool surfaces a poisoned page, an MCP server returns attacker-controlled data. (PoisonedRAG, USENIX Security 2025: 5 planted documents → 90% attack-success rate.) `scanToolOutput()` scans it with a dedicated `tool-output` profile and stamps the tool name into every violation.

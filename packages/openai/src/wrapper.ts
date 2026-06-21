@@ -1,4 +1,11 @@
-import type { AIShield, ShieldConfig, ScanContext, ScanResult } from "ai-shield-core";
+import type {
+  AIShield,
+  ShieldConfig,
+  ScanContext,
+  ScanResult,
+  OutputScanConfig,
+  OutputScanResult,
+} from "ai-shield-core";
 
 // ============================================================
 // OpenAI Shield Wrapper — Drop-in replacement
@@ -15,8 +22,19 @@ export interface ShieldedOpenAIConfig {
   agentId?: string;
   /** Custom scan context factory */
   contextFactory?: (messages: ChatMessage[]) => ScanContext;
-  /** Whether to scan output (response) too — default: false */
+  /**
+   * Legacy: run the INPUT scan chain (heuristic + PII) over the output too.
+   * Default false. For real output-side defense (secret leak, SQL/XSS/shell
+   * injection, system-prompt leak) use `outputScan` below (OWASP LLM05).
+   */
   scanOutput?: boolean;
+  /**
+   * Run the dedicated output scanner over the response (OWASP LLM05 / LLM02):
+   * secret leak, output injection, system-prompt leak, jailbreak, output-side
+   * PII. Pass `true` for defaults or an `OutputScanConfig`. Result lands in
+   * `response._shield.outputScan`.
+   */
+  outputScan?: boolean | OutputScanConfig;
   /** Callback when input is blocked */
   onBlocked?: (result: ScanResult, messages: ChatMessage[]) => void;
   /** Callback when input has warnings */
@@ -195,10 +213,29 @@ export class ShieldedOpenAI {
     return { shieldInstance, context, userContent, inputResult, finalParams };
   }
 
+  /** Run the dedicated OutputScanner if `outputScan` is configured. */
+  private async runOutputScan(
+    text: string,
+    context: ScanContext,
+  ): Promise<OutputScanResult | undefined> {
+    if (!this.config.outputScan || !text) return undefined;
+    const cfg = this.config.outputScan === true ? {} : this.config.outputScan;
+    const mod = await import("ai-shield-core");
+    return mod.scanOutput(text, cfg, context);
+  }
+
   /** Create chat completion with Shield protection (non-streaming) */
   async createChatCompletion(
     params: ChatCompletionParams,
-  ): Promise<ChatCompletion & { _shield?: { input: ScanResult; output?: ScanResult } }> {
+  ): Promise<
+    ChatCompletion & {
+      _shield?: {
+        input: ScanResult;
+        output?: ScanResult;
+        outputScan?: OutputScanResult;
+      };
+    }
+  > {
     const { shieldInstance, context, inputResult, finalParams } = await this.scanInput(params);
 
     // --- Make the actual API call ---
@@ -215,17 +252,16 @@ export class ShieldedOpenAI {
     }
 
     // --- Scan output ---
+    const outputText = response.choices[0]?.message?.content ?? "";
     let outputResult: ScanResult | undefined;
-    if (this.config.scanOutput) {
-      const outputText = response.choices[0]?.message?.content ?? "";
-      if (outputText) {
-        outputResult = await shieldInstance.scan(outputText, context);
-      }
+    if (this.config.scanOutput && outputText) {
+      outputResult = await shieldInstance.scan(outputText, context);
     }
+    const outputScan = await this.runOutputScan(outputText, context);
 
     return {
       ...response,
-      _shield: { input: inputResult, output: outputResult },
+      _shield: { input: inputResult, output: outputResult, outputScan },
     };
   }
 
@@ -250,6 +286,7 @@ export class ShieldedOpenAI {
       this.config.scanOutput ?? false,
       this.config.agentId,
       finalParams.model,
+      this.config.outputScan,
     );
   }
 
@@ -305,12 +342,14 @@ export class ShieldedOpenAI {
 export class ShieldedChatStream implements AsyncIterable<ChatCompletionChunk> {
   private _inputResult: ScanResult;
   private _outputResult: ScanResult | undefined;
+  private _outputScanResult: OutputScanResult | undefined;
   private _done = false;
   private _fullText = "";
   private _stream: AsyncIterable<ChatCompletionChunk>;
   private _shieldInstance: AIShield;
   private _context: ScanContext;
   private _scanOutput: boolean;
+  private _outputScan: boolean | OutputScanConfig | undefined;
   private _agentId: string | undefined;
   private _model: string;
   private _usage: { prompt_tokens: number; completion_tokens: number } | undefined;
@@ -323,12 +362,14 @@ export class ShieldedChatStream implements AsyncIterable<ChatCompletionChunk> {
     scanOutput: boolean,
     agentId: string | undefined,
     model: string,
+    outputScan?: boolean | OutputScanConfig,
   ) {
     this._stream = stream;
     this._inputResult = inputResult;
     this._shieldInstance = shieldInstance;
     this._context = context;
     this._scanOutput = scanOutput;
+    this._outputScan = outputScan;
     this._agentId = agentId;
     this._model = model;
   }
@@ -369,6 +410,15 @@ export class ShieldedChatStream implements AsyncIterable<ChatCompletionChunk> {
         this._context,
       );
     }
+    if (this._outputScan && this._fullText) {
+      const cfg = this._outputScan === true ? {} : this._outputScan;
+      const mod = await import("ai-shield-core");
+      this._outputScanResult = await mod.scanOutput(
+        this._fullText,
+        cfg,
+        this._context,
+      );
+    }
 
     this._done = true;
   }
@@ -378,14 +428,27 @@ export class ShieldedChatStream implements AsyncIterable<ChatCompletionChunk> {
     return this._inputResult;
   }
 
-  /** Output scan result (available after stream completes) */
+  /** Output scan result (legacy input-chain over output; after stream completes) */
   get outputResult(): ScanResult | undefined {
     return this._outputResult;
   }
 
+  /** Dedicated OutputScanner result (after stream completes, if `outputScan` set) */
+  get outputScanResult(): OutputScanResult | undefined {
+    return this._outputScanResult;
+  }
+
   /** Combined shield results */
-  get shieldResult(): { input: ScanResult; output?: ScanResult } {
-    return { input: this._inputResult, output: this._outputResult };
+  get shieldResult(): {
+    input: ScanResult;
+    output?: ScanResult;
+    outputScan?: OutputScanResult;
+  } {
+    return {
+      input: this._inputResult,
+      output: this._outputResult,
+      outputScan: this._outputScanResult,
+    };
   }
 
   /** Whether the stream has completed */

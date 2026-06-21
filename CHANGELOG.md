@@ -54,6 +54,13 @@ No breaking changes. All v0.1 / v0.2 APIs continue to work unchanged.
   collapsed form. Extended the homoglyph map (more Cyrillic / Greek /
   Armenian look-alikes), and added a GCG-style **adversarial-suffix**
   structural signal.
+- **`outputScan` flag on the SDK wrappers** — `ShieldedAnthropic`,
+  `ShieldedOpenAI` and the Gemini wrapper now accept
+  `outputScan: true | OutputScanConfig`, which runs the dedicated
+  `OutputScanner` over the model response (non-streaming and streaming) and
+  surfaces the result on `response._shield.outputScan` /
+  `stream.outputScanResult`. The legacy `scanOutput: boolean` flag (input
+  chain over the output) is unchanged — additive, not breaking.
 
 ### Changed
 
