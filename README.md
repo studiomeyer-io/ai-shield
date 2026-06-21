@@ -18,7 +18,7 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 [![TypeScript](https://img.shields.io/badge/TypeScript-strict-blue.svg)](tsconfig.json)
 [![Zero Dependencies](https://img.shields.io/badge/dependencies-0-brightgreen.svg)](package.json)
-[![Tests: 672 passing](https://img.shields.io/badge/tests-672%20passing-brightgreen.svg)](tests/)
+[![Tests: 688 passing](https://img.shields.io/badge/tests-688%20passing-brightgreen.svg)](tests/)
 
 Prompt injection detection · Indirect-injection (RAG / tool-desc / tool-output / memory / web) · Output scanning (SQL / shell / XSS / secret leak) · PII protection · Trust-tier context streams · Multi-agent trust propagation · Memory poisoning detection · Tool policy enforcement · Circuit breakers · Async LLM-judge · Cost tracking · Audit logging
 
