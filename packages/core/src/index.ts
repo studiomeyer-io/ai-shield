@@ -10,6 +10,9 @@ export {
   HeuristicScanner,
   normalizeForInjectionScan,
   collapseSpacedLetters,
+  deTagForInjectionScan,
+  hasTagChars,
+  leetDecodeForInjectionScan,
   type HeuristicConfig,
 } from "./scanner/heuristic.js";
 export { PIIScanner } from "./scanner/pii.js";
@@ -159,11 +162,20 @@ export async function shield(
   input: string,
   configOrContext?: ShieldConfig | ScanContext,
 ): Promise<ScanResult> {
-  // Detect if second arg is config or context
-  const isConfig = configOrContext && ("injection" in configOrContext || "pii" in configOrContext || "cost" in configOrContext || "preset" in configOrContext && typeof configOrContext.preset === "string" && !("agentId" in configOrContext));
-
-  const config = isConfig ? (configOrContext as ShieldConfig) : {};
-  const context = isConfig ? {} : (configOrContext as ScanContext) ?? {};
+  // Decide whether the second arg is a ShieldConfig or a ScanContext.
+  //
+  // The two types share the ambiguous keys `preset` and `tools`, so key-
+  // sniffing on `preset` alone is wrong: a real `{ preset, source: "rag" }`
+  // ScanContext used to be misread as a config, silently dropping its
+  // userId/sessionId/source and breaking ingestion routing. Route on a real
+  // discriminant instead — context-only keys win over the shared ones — and
+  // parenthesize explicitly so the `||`/`&&` precedence can't bite again.
+  const config = isShieldConfig(configOrContext)
+    ? (configOrContext as ShieldConfig)
+    : {};
+  const context = isShieldConfig(configOrContext)
+    ? {}
+    : ((configOrContext as ScanContext) ?? {});
 
   const instance = new AIShield(config);
   try {
@@ -171,6 +183,49 @@ export async function shield(
   } finally {
     await instance.close();
   }
+}
+
+/** Keys that exist ONLY on ScanContext (never on ShieldConfig). */
+const CONTEXT_ONLY_KEYS = [
+  "agentId",
+  "sessionId",
+  "userId",
+  "userType",
+  "locale",
+  "source",
+  "trustTier",
+] as const;
+
+/** Keys that exist ONLY on ShieldConfig (never on ScanContext). */
+const CONFIG_ONLY_KEYS = [
+  "injection",
+  "pii",
+  "cost",
+  "audit",
+  "cache",
+] as const;
+
+/**
+ * True when `arg` should be treated as a ShieldConfig (vs a ScanContext).
+ *
+ * Decision order:
+ *  1. Any context-only key present (e.g. `source`, `userId`) → it's a context.
+ *  2. Otherwise any config-only key present → it's a config.
+ *  3. Only the ambiguous `preset`/`tools` (or empty/undefined) → default to a
+ *     context, the lower-blast-radius interpretation (a stray `preset` on a
+ *     context is harmless; misrouting a context loses ingestion metadata).
+ */
+function isShieldConfig(
+  arg: ShieldConfig | ScanContext | undefined,
+): arg is ShieldConfig {
+  if (!arg || typeof arg !== "object") return false;
+  for (const k of CONTEXT_ONLY_KEYS) {
+    if (k in arg) return false;
+  }
+  for (const k of CONFIG_ONLY_KEYS) {
+    if (k in arg) return true;
+  }
+  return false;
 }
 
 /**

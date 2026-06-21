@@ -32,6 +32,36 @@ describe("OutputScanner — secret leak", () => {
     const r = await scanOutput("ghp_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa and ghp_bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb");
     expect(r.sanitized.match(/\[REDACTED_SECRET\]/g)?.length).toBe(2);
   });
+
+  it("scrubs a zero-width-split secret out of sanitized (bug: detect on normalized, redact on raw)", async () => {
+    // The key is detected on the normalized output (zero-width chars stripped)
+    // and blocks, but a naive raw `.replace()` misses the split form — leaving
+    // the live key in `sanitized`. The scrub-on-block guarantee must remove it.
+    const ZWSP = "\u200B";
+    const split = "sk-ant-" + "a".repeat(12) + ZWSP + "a".repeat(12);
+    const collapsed = "sk-ant-" + "a".repeat(24);
+    const r = await scanOutput(`leaked: ${split} — handle with care`);
+
+    expect(r.decision).toBe("block");
+    expect(r.violations.some((v) => v.type === "secret_leak")).toBe(true);
+    expect(r.sanitized).toContain("[REDACTED_SECRET]");
+    // The live secret must be gone in EVERY form: split, collapsed, and any
+    // surviving fragment of it.
+    expect(r.sanitized).not.toContain(split);
+    expect(r.sanitized).not.toContain(collapsed);
+    expect(r.sanitized).not.toContain("sk-ant-" + "a".repeat(12));
+    // No stray zero-width char left dangling either.
+    expect(r.sanitized).not.toContain(ZWSP);
+    // Surrounding text is preserved.
+    expect(r.sanitized).toContain("handle with care");
+  });
+
+  it("clean (non-split) secret still redacts and preserves surrounding text", async () => {
+    const r = await scanOutput("token is sk-proj-abcdefghijklmnop1234567890 thanks");
+    expect(r.sanitized).toContain("[REDACTED_SECRET]");
+    expect(r.sanitized).not.toContain("sk-proj-abcdefghijklmnop");
+    expect(r.sanitized).toContain("thanks");
+  });
 });
 
 describe("OutputScanner — output injection (LLM05)", () => {

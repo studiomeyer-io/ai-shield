@@ -219,14 +219,13 @@ export class OutputScanner {
       if (priority(d) > priority(worst)) worst = d;
     };
 
-    // 1. Secret leak — high-confidence, always blocks. Redact in `sanitized`.
-    //    Detection runs on the normalized full output; redaction is
-    //    best-effort over the raw output (a key fragmented by zero-width
-    //    chars is still flagged via `fullDetect` and blocks, but may resist
-    //    clean redaction — callers MUST gate on `safe`/`decision` and never
-    //    forward a blocked output regardless of `sanitized`).
+    // 1. Secret leak — high-confidence, always blocks. Detection runs on the
+    //    normalized full output (so a key fragmented by zero-width / homoglyph
+    //    chars is still flagged), and redaction MUST guarantee the live secret
+    //    never survives in `sanitized` — not just best-effort.
     if (checks.secrets !== false) {
       checksRun.push("secrets");
+      const matchedSecretREs: RegExp[] = [];
       for (const { id, re, label } of SECRET_PATTERNS) {
         if (re.test(fullDetect)) {
           violations.push({
@@ -238,11 +237,31 @@ export class OutputScanner {
             detail: `Rule ${id}`,
           });
           bump("block");
-          // Redact every occurrence in the full output (global copy of re).
-          sanitized = sanitized.replace(
-            new RegExp(re.source, re.flags.includes("g") ? re.flags : re.flags + "g"),
-            SECRET_REDACTION,
+          matchedSecretREs.push(re);
+          // First pass: redact every occurrence in the raw output. This is the
+          // clean case and preserves the surrounding formatting.
+          sanitized = sanitized.replace(globalCopy(re), SECRET_REDACTION);
+        }
+      }
+      // Scrub-on-block guarantee: detection saw the secret in the NORMALIZED
+      // text, but the raw `.replace()` above can miss a key that was split by
+      // invisible chars ("sk-ant-...<ZWSP>...") — the raw form doesn't match
+      // the anchored pattern, so the live key would survive in `sanitized`.
+      // If any matched pattern still hits the normalized sanitized output, the
+      // evasion-split key got through: strip the zero-width chars (they are
+      // invisible, so this never alters how benign text reads) so the key
+      // collapses, then redact again. The result: `sanitized` is free of the
+      // live secret regardless of the evasion used.
+      if (matchedSecretREs.length > 0) {
+        const stillLeaks = (): boolean =>
+          matchedSecretREs.some((re) =>
+            re.test(normalizeForInjectionScan(sanitized)),
           );
+        if (stillLeaks()) {
+          sanitized = stripZeroWidth(sanitized);
+          for (const re of matchedSecretREs) {
+            sanitized = sanitized.replace(globalCopy(re), SECRET_REDACTION);
+          }
         }
       }
     }
@@ -383,4 +402,17 @@ function normalizeTokens(tokens?: string | string[]): string[] {
 
 function priority(d: ScanDecision): number {
   return d === "block" ? 2 : d === "warn" ? 1 : 0;
+}
+
+/** Return a global-flagged copy of `re` (idempotent if already global). */
+function globalCopy(re: RegExp): RegExp {
+  return new RegExp(re.source, re.flags.includes("g") ? re.flags : re.flags + "g");
+}
+
+// Zero-width / BOM chars (U+200B..U+200D, U+2060, U+FEFF) used to fragment a
+// secret across a pattern boundary. Stripping them is safe in `sanitized`
+// because they render as nothing — benign visible text is unaffected.
+const OUTPUT_ZERO_WIDTH_RE = /[\u200B-\u200D\u2060\uFEFF]/g;
+function stripZeroWidth(s: string): string {
+  return s.replace(OUTPUT_ZERO_WIDTH_RE, "");
 }
