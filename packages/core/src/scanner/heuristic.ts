@@ -30,6 +30,66 @@ const HOMOGLYPH_RE = new RegExp(Object.keys(HOMOGLYPH_MAP).join("|"), "g");
 const ZERO_WIDTH_RE = /[​-‍⁠﻿]/g;
 // Combining marks (diacritics) after NFKC can still slip through (U+0300..U+036F).
 const COMBINING_RE = /[̀-ͯ]/g;
+// Unicode TAG block (U+E0000..U+E007F). Invisible code points with no
+// legitimate use in prose. U+E0020..U+E007E are tag-equivalents of ASCII
+// 0x20..0x7E, so an attacker can spell "ignore previous instructions" entirely
+// in tag chars: it renders as nothing but a model still reads the ASCII intent.
+const TAG_RANGE_RE = /[\u{E0000}-\u{E007F}]/u;
+
+/**
+ * Decode Unicode TAG-block smuggling: U+E0020..U+E007E carry the ASCII
+ * characters 0x20..0x7E (subtract 0xE0000). U+E0001 (language tag) and
+ * U+E007F (cancel tag) are control points with no ASCII payload and are
+ * dropped. Returns the ASCII the invisible tag run was hiding, so the normal
+ * injection patterns can scan it.
+ */
+export function deTagForInjectionScan(input: string): string {
+  // Fast path: most inputs have no tag chars at all.
+  if (!TAG_RANGE_RE.test(input)) return input;
+  let out = "";
+  for (const ch of input) {
+    const cp = ch.codePointAt(0)!;
+    if (cp >= 0xe0000 && cp <= 0xe007f) {
+      const ascii = cp - 0xe0000;
+      // 0x20..0x7E map to printable ASCII; the rest (E0000/E0001/E007F) drop.
+      if (ascii >= 0x20 && ascii <= 0x7e) out += String.fromCharCode(ascii);
+    } else {
+      out += ch;
+    }
+  }
+  return out;
+}
+
+/** True if the input contains any Unicode TAG-block char (invisible smuggling). */
+export function hasTagChars(input: string): boolean {
+  return TAG_RANGE_RE.test(input);
+}
+
+/**
+ * Lossy leetspeak fold: maps the common char-substitutions an attacker uses to
+ * dodge literal patterns ("1gn0r3 pr3v10us 1nstruct10ns" → "ignore previous
+ * instructions"). Run as an ADDITIONAL view (like collapseSpacedLetters), never
+ * as a replacement, and only the high-value injection categories are re-tested
+ * against it — folding digits to letters in ordinary prose ("buy 3 items for 5
+ * dollars" → "buy e items for s dollars") would otherwise generate noise.
+ *
+ * 1→i (dominant in injection payloads like "1nstruct10ns"); the other digits
+ * are unambiguous. @→a and $→s cover the classic symbol substitutions.
+ */
+const LEET_MAP: Record<string, string> = {
+  "0": "o",
+  "1": "i",
+  "3": "e",
+  "4": "a",
+  "5": "s",
+  "7": "t",
+  "@": "a",
+  "$": "s",
+};
+const LEET_RE = /[013457@$]/g;
+export function leetDecodeForInjectionScan(input: string): string {
+  return input.replace(LEET_RE, (ch) => LEET_MAP[ch] ?? ch);
+}
 
 /**
  * Normalize input for pattern matching. Returns the canonicalized string
@@ -37,14 +97,21 @@ const COMBINING_RE = /[̀-ͯ]/g;
  * is still the original input.
  *
  * Order matters:
- * 1. NFKD folds compatibility forms (fullwidth → ASCII, ligatures) AND
+ * 1. Decode Unicode TAG-block smuggling so invisible tag chars surface as the
+ *    ASCII they carry ("ignore previous instructions" hidden in U+E00xx).
+ * 2. NFKD folds compatibility forms (fullwidth → ASCII, ligatures) AND
  *    decomposes precomposed accented letters into base + combining mark.
- * 2. Strip zero-width chars so "ig<ZWSP>nore" collapses to "ignore".
- * 3. Strip combining marks (diacritics) left behind by NFKD.
- * 4. Map remaining Cyrillic/Greek look-alikes to Latin.
+ * 3. Strip zero-width chars so "ig<ZWSP>nore" collapses to "ignore".
+ * 4. Strip combining marks (diacritics) left behind by NFKD.
+ * 5. Map remaining Cyrillic/Greek look-alikes to Latin.
+ *
+ * Side effect of step 2+4: accented Latin letters lose their diacritic and
+ * fold to the base letter ("précédentes" → "precedentes", "ö" → "o"). The
+ * localized injection patterns below are written against this folded form.
  */
 export function normalizeForInjectionScan(input: string): string {
-  const nfkd = input.normalize("NFKD");
+  const deTagged = deTagForInjectionScan(input);
+  const nfkd = deTagged.normalize("NFKD");
   const noZW = nfkd.replace(ZERO_WIDTH_RE, "");
   const noCombining = noZW.replace(COMBINING_RE, "");
   return noCombining.replace(HOMOGLYPH_RE, (ch) => HOMOGLYPH_MAP[ch] ?? ch);
@@ -84,6 +151,7 @@ interface PatternRule {
 
 type InjectionCategory =
   | "instruction_override"
+  | "localized_override"
   | "role_manipulation"
   | "system_prompt_extraction"
   | "encoding_evasion"
@@ -149,6 +217,44 @@ const PATTERNS: PatternRule[] = [
     pattern: /instead[,\s]+(you\s+)?(will|must|should|shall)\s+/i,
     weight: 0.15,
     description: "Instead directive",
+  },
+
+  // --- Localized Instruction Override (DE / ES / FR) ---
+  // DACH-critical: the English INJ-* rules above miss German/Spanish/French
+  // "ignore previous instructions" entirely, so a non-English payload scored
+  // `allow`. Patterns run against the NFKD-folded text (accents/umlauts already
+  // stripped: "präzedenzfall" → "prazedenzfall", "précédentes" → "precedentes"),
+  // so they spell the base-letter forms. The bounded `[\s\S]{0,40}?` gap is
+  // lazy + length-capped → ReDoS-safe. An override verb is REQUIRED before the
+  // object noun, so benign prose that merely mentions "Anweisungen" /
+  // "instrucciones" / "instructions" does not trip them.
+  {
+    id: "INJ-DE-1",
+    category: "localized_override",
+    pattern: /\b(?:ignoriere?|missachte|vergiss|verwirf|uebergehe|ueberschreibe)\b[\s\S]{0,40}?\b(?:alle[ns]?|deine|die|jegliche)?\s*(?:vorherigen?|bisherigen?|obigen?|frueheren?|vorhergehenden?|urspruenglichen?)\s+(?:anweisungen?|anordnungen?|befehle?|regeln?|vorgaben?|instruktionen?)/i,
+    weight: 0.30,
+    description: "German instruction override",
+  },
+  {
+    id: "INJ-DE-2",
+    category: "localized_override",
+    pattern: /\bdu\s+bist\s+(?:jetzt|ab\s+jetzt|nun)\s+(?:ein|eine|der|die|das|mein|meine)\b/i,
+    weight: 0.25,
+    description: "German role takeover (du bist jetzt …)",
+  },
+  {
+    id: "INJ-ES-1",
+    category: "localized_override",
+    pattern: /\b(?:ignora|olvida|descarta|desestima|omite|anula)\b[\s\S]{0,40}?\b(?:todas?\s+)?(?:las?\s+)?(?:instrucciones?|ordenes?|reglas?|directrices?|indicaciones?)\s+(?:anteriores?|previas?|precedentes?|de\s+arriba)/i,
+    weight: 0.30,
+    description: "Spanish instruction override",
+  },
+  {
+    id: "INJ-FR-1",
+    category: "localized_override",
+    pattern: /\b(?:ignore|oublie|neglige|ne\s+tiens?\s+pas\s+compte\s+de|fais\s+abstraction\s+de)\b[\s\S]{0,40}?\b(?:toutes?\s+)?(?:les?\s+|tes\s+|mes\s+)?(?:instructions?|consignes?|directives?|regles?|ordres?)\s*(?:precedentes?|anterieures?|au-dessus|ci-dessus)?/i,
+    weight: 0.30,
+    description: "French instruction override",
   },
 
   // --- Role Manipulation (weight: 0.25 each) ---
@@ -320,6 +426,52 @@ const PATTERNS: PatternRule[] = [
     description: "Llama special token injection",
   },
 
+  // --- Policy-Puppetry / Fake-Config Injection ---
+  // HiddenLayer 2025 "Policy Puppetry" universal bypass: the attacker pastes a
+  // fake config block (interaction-config / allowed-modes / blocked-strings)
+  // or a forged chat transcript (<assistant>…</assistant> turns) so the model
+  // treats user content as authoritative configuration. These previously
+  // scored `allow` — only DELIM-003's bare <system> tag was covered. Tags are
+  // specific enough (hyphenated config names, full open+close transcript turns)
+  // that ordinary HTML/JSX prose does not trip them.
+  {
+    id: "DELIM-PP-1",
+    category: "delimiter_injection",
+    pattern: /<\/?(?:interaction-config|interaction_config|system-config|model-config|ai-config)\b/i,
+    weight: 0.40,
+    description: "Fake interaction-config block",
+  },
+  {
+    id: "DELIM-PP-2",
+    category: "delimiter_injection",
+    pattern: /<\/?(?:allowed-modes|allowed_modes|blocked-modes|allowed-responses)\b/i,
+    weight: 0.35,
+    description: "Fake allowed-modes directive",
+  },
+  {
+    id: "DELIM-PP-3",
+    category: "delimiter_injection",
+    pattern: /<\/?(?:blocked-strings|blocked_strings|blocked-words|forbidden-strings|blocked-responses)\b/i,
+    weight: 0.35,
+    description: "Fake blocked-strings directive",
+  },
+  {
+    id: "DELIM-PP-4",
+    category: "delimiter_injection",
+    pattern: /<role>\s*(?:god|dan|admin|root|developer|jailbroken|unrestricted|sudo)\b/i,
+    weight: 0.35,
+    description: "Fake privileged <role> assignment",
+  },
+  {
+    // Forged transcript turn: a full open+close <assistant>/<user>/<human>
+    // tag pair. The bounded lazy gap is ReDoS-safe (verified <3ms on 200 KB).
+    id: "DELIM-PP-5",
+    category: "delimiter_injection",
+    pattern: /<\/?(?:assistant|user|human)\b[^>]*>[\s\S]{0,200}?<\/(?:assistant|user|human)>/i,
+    weight: 0.30,
+    description: "Forged chat transcript turn",
+  },
+
   // --- Context Manipulation (weight: 0.20 each) ---
   {
     id: "CTX-001",
@@ -427,7 +579,7 @@ export class HeuristicScanner implements Scanner {
     let totalScore = 0;
 
     // Normalize once — pattern matching runs against the canonical form so
-    // homoglyph/zero-width evasion doesn't bypass the rules. The caller
+    // homoglyph/zero-width/tag evasion doesn't bypass the rules. The caller
     // still sees the original input in `sanitized`.
     const normalized = normalizeForInjectionScan(input);
     // Second view that un-splits letter-splitting evasion ("i g n o r e").
@@ -437,8 +589,26 @@ export class HeuristicScanner implements Scanner {
     // would false-positive on collapsed prose.
     const collapsed = collapseSpacedLetters(normalized);
     const collapsedDiffers = collapsed !== normalized;
+    // Third view that folds leetspeak ("1gn0r3 pr3v10us" → "ignore previous").
+    // Same discipline: ADDITIONAL pass, only computed when it differs, and only
+    // the high-value categories are re-tested — digit→letter folding in benign
+    // prose ("buy 3 items for 5 dollars") would otherwise generate noise.
+    const leetView = leetDecodeForInjectionScan(normalized);
+    const leetDiffers = leetView !== normalized;
+    // Categories where a lossy re-test is worth the FP risk. Leetspeak excludes
+    // encoding_evasion (ENCODE-003 is the long-base64 rule — folding its
+    // digits would make any base64 blob match nothing useful) and the
+    // low-confidence framing/output categories.
     const SPLIT_SENSITIVE: ReadonlySet<InjectionCategory> = new Set([
       "instruction_override",
+      "localized_override",
+      "role_manipulation",
+      "system_prompt_extraction",
+      "tool_abuse",
+    ]);
+    const LEET_SENSITIVE: ReadonlySet<InjectionCategory> = new Set([
+      "instruction_override",
+      "localized_override",
       "role_manipulation",
       "system_prompt_extraction",
       "tool_abuse",
@@ -470,7 +640,40 @@ export class HeuristicScanner implements Scanner {
           message: rule.description,
           detail: `Rule ${rule.id} (${rule.category}, letter-splitting evasion)`,
         });
+      } else if (
+        leetDiffers &&
+        LEET_SENSITIVE.has(rule.category) &&
+        rule.pattern.test(leetView)
+      ) {
+        // Matched only after leetspeak folding → char-substitution evasion.
+        totalScore += rule.weight;
+        violations.push({
+          type: "prompt_injection",
+          scanner: this.name,
+          score: rule.weight,
+          threshold: this.threshold,
+          message: rule.description,
+          detail: `Rule ${rule.id} (${rule.category}, leetspeak evasion)`,
+        });
       }
+    }
+
+    // Unicode TAG-block smuggling signal. `normalizeForInjectionScan` already
+    // de-tagged the payload above so any hidden ASCII instruction was scored by
+    // the rules — but the mere PRESENCE of invisible tag chars in user-supplied
+    // text is itself an attack indicator (no benign text uses U+E00xx). Add a
+    // strong standalone signal so even a tag run that decodes to nothing
+    // pattern-matchable still surfaces.
+    if (hasTagChars(input)) {
+      totalScore += 0.5;
+      violations.push({
+        type: "prompt_injection",
+        scanner: this.name,
+        score: 0.5,
+        threshold: this.threshold,
+        message: "Invisible Unicode TAG characters detected (smuggling)",
+        detail: "Rule TAG-001 (encoding_evasion, U+E0000–E007F)",
+      });
     }
 
     // Structural signals (cumulative) — intentionally run on the original
