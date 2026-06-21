@@ -1,6 +1,6 @@
 {
   "name": "ai-shield-anthropic",
-  "version": "0.3.0",
+  "version": "0.4.0",
   "license": "MIT",
   "description": "AI Shield wrapper for Anthropic SDK — automatic input/output scanning",
   "type": "module",
@@ -20,7 +20,7 @@
     "@anthropic-ai/sdk": ">=0.30.0"
   },
   "dependencies": {
-    "ai-shield-core": "0.3.0"
+    "ai-shield-core": "0.4.0"
   },
   "devDependencies": {
     "@anthropic-ai/sdk": "^0.104.1",

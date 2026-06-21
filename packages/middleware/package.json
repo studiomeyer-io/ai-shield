@@ -1,6 +1,6 @@
 {
   "name": "ai-shield-middleware",
-  "version": "0.3.0",
+  "version": "0.4.0",
   "license": "MIT",
   "description": "AI Shield middleware for Express and Hono — route-level LLM protection",
   "type": "module",
@@ -29,11 +29,15 @@
     "hono": ">=4.0.0"
   },
   "peerDependenciesMeta": {
-    "express": { "optional": true },
-    "hono": { "optional": true }
+    "express": {
+      "optional": true
+    },
+    "hono": {
+      "optional": true
+    }
   },
   "dependencies": {
-    "ai-shield-core": "0.3.0"
+    "ai-shield-core": "0.4.0"
   },
   "devDependencies": {
     "@types/express": "^5.0.0",
