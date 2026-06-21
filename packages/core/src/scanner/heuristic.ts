@@ -11,12 +11,17 @@ import type { Scanner, ScannerResult, ScanContext, Violation } from "../types.js
 // Keep minimal — false-mappings in real content are worse than
 // false-negatives in an attack attempt.
 const HOMOGLYPH_MAP: Record<string, string> = {
+  // Cyrillic
   "а": "a", "е": "e", "і": "i", "ј": "j", "о": "o", "р": "p", "с": "c", "ѕ": "s",
-  "у": "y", "х": "x", "А": "A", "В": "B", "Е": "E", "І": "I", "К": "K", "М": "M",
-  "Н": "H", "О": "O", "Р": "P", "С": "C", "Т": "T", "Х": "X",
-  "α": "a", "ο": "o", "ρ": "p", "ε": "e", "υ": "y", "χ": "x", "Α": "A", "Β": "B",
-  "Ε": "E", "Ζ": "Z", "Η": "H", "Ι": "I", "Κ": "K", "Μ": "M", "Ν": "N", "Ο": "O",
-  "Ρ": "P", "Τ": "T", "Υ": "Y", "Χ": "X",
+  "у": "y", "х": "x", "ԁ": "d", "һ": "h", "ӏ": "l", "ո": "n", "А": "A", "В": "B",
+  "Е": "E", "І": "I", "К": "K", "М": "M", "Н": "H", "О": "O", "Р": "P", "С": "C",
+  "Т": "T", "Х": "X", "Ѕ": "S", "Ј": "J", "Ү": "Y", "Ԛ": "Q", "Ԝ": "W", "Ғ": "F",
+  // Greek
+  "α": "a", "ο": "o", "ρ": "p", "ε": "e", "υ": "y", "χ": "x", "ν": "v", "ι": "i",
+  "κ": "k", "Α": "A", "Β": "B", "Ε": "E", "Ζ": "Z", "Η": "H", "Ι": "I", "Κ": "K",
+  "Μ": "M", "Ν": "N", "Ο": "O", "Ρ": "P", "Τ": "T", "Υ": "Y", "Χ": "X",
+  // Armenian / Cherokee / other look-alikes occasionally used in evasion
+  "օ": "o", "ѵ": "v",
 };
 
 const HOMOGLYPH_RE = new RegExp(Object.keys(HOMOGLYPH_MAP).join("|"), "g");
@@ -43,6 +48,30 @@ export function normalizeForInjectionScan(input: string): string {
   const noZW = nfkd.replace(ZERO_WIDTH_RE, "");
   const noCombining = noZW.replace(COMBINING_RE, "");
   return noCombining.replace(HOMOGLYPH_RE, (ch) => HOMOGLYPH_MAP[ch] ?? ch);
+}
+
+/**
+ * Collapse letter-splitting evasion: an attacker writes `i g n o r e` or
+ * `i.g.n.o.r.e` or `i-g-n-o-r-e` to break the literal token "ignore" across
+ * separators so the regex never matches. This produces an ADDITIONAL view
+ * where any run of `single-letter + separator` (≥4 letters) has its
+ * separators removed, so the spaced form collapses back to "ignore".
+ *
+ * Run as a second pass IN ADDITION to the normal normalized text — never
+ * as a replacement — because collapsing is lossy (it would also fuse the
+ * legitimate "a b c" list). Only single-letter groups separated by one
+ * space / dot / dash / underscore are collapsed; multi-letter words are
+ * left intact, which keeps benign prose untouched.
+ */
+export function collapseSpacedLetters(input: string): string {
+  // Match ≥3 "<letter><sep>" groups closed by a final lone letter. The
+  // trailing `(?![A-Za-z])` stops the greedy match from swallowing the
+  // first letter of the next real word ("i g n o r e all" must collapse to
+  // "ignore all", not "ignorea ll"). Bounded, linear — no nested quantifier.
+  return input.replace(
+    /(?:[A-Za-z][ \t._-]){3,}[A-Za-z](?![A-Za-z])/g,
+    (run) => run.replace(/[ \t._-]/g, ""),
+  );
 }
 
 interface PatternRule {
@@ -401,6 +430,19 @@ export class HeuristicScanner implements Scanner {
     // homoglyph/zero-width evasion doesn't bypass the rules. The caller
     // still sees the original input in `sanitized`.
     const normalized = normalizeForInjectionScan(input);
+    // Second view that un-splits letter-splitting evasion ("i g n o r e").
+    // Only computed when it actually differs (cheap guard), and only the
+    // high-value override/role/extraction/tool categories are re-tested
+    // against it — collapsing is lossy and the low-value framing rules
+    // would false-positive on collapsed prose.
+    const collapsed = collapseSpacedLetters(normalized);
+    const collapsedDiffers = collapsed !== normalized;
+    const SPLIT_SENSITIVE: ReadonlySet<InjectionCategory> = new Set([
+      "instruction_override",
+      "role_manipulation",
+      "system_prompt_extraction",
+      "tool_abuse",
+    ]);
 
     for (const rule of this.patterns) {
       if (rule.pattern.test(normalized)) {
@@ -412,6 +454,21 @@ export class HeuristicScanner implements Scanner {
           threshold: this.threshold,
           message: rule.description,
           detail: `Rule ${rule.id} (${rule.category})`,
+        });
+      } else if (
+        collapsedDiffers &&
+        SPLIT_SENSITIVE.has(rule.category) &&
+        rule.pattern.test(collapsed)
+      ) {
+        // Matched only after un-splitting → letter-splitting evasion.
+        totalScore += rule.weight;
+        violations.push({
+          type: "prompt_injection",
+          scanner: this.name,
+          score: rule.weight,
+          threshold: this.threshold,
+          message: rule.description,
+          detail: `Rule ${rule.id} (${rule.category}, letter-splitting evasion)`,
         });
       }
     }
@@ -458,6 +515,25 @@ export class HeuristicScanner implements Scanner {
 
     // Very long input (potential padding attack)
     if (input.length > 5000) score += 0.05;
+
+    // Adversarial suffix (GCG-style): a long whitespace-free token packed
+    // with mixed punctuation/symbols, typically appended after the readable
+    // request. Conservative — needs ≥25 chars and ≥6 distinct punctuation
+    // marks so ordinary URLs, hashes and code tokens don't trip it.
+    const ADV_TOKEN_RE = /\S{25,}/g;
+    let advMatch: RegExpExecArray | null;
+    let advCount = 0;
+    while ((advMatch = ADV_TOKEN_RE.exec(input)) !== null && advCount < 32) {
+      advCount += 1;
+      const tok = advMatch[0];
+      const distinctPunct = new Set(
+        (tok.match(/[!-/:-@[-`{-~]/g) ?? []),
+      ).size;
+      if (distinctPunct >= 6) {
+        score += 0.05;
+        break;
+      }
+    }
 
     return score;
   }

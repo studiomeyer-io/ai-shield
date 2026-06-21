@@ -302,3 +302,174 @@ export function flattenViolations(ctx: WrappedContext): Violation[] {
   if (!ctx.scanResults) return [];
   return ctx.scanResults.flatMap((r) => r.violations);
 }
+
+// ============================================================
+// propagateTrust — Multi-Agent Trust Propagation
+//
+// In a multi-agent pipeline one agent's output becomes the next agent's
+// input. A successful injection in agent A propagates: A summarizes a
+// poisoned document, B reads A's summary and decides, C executes. The
+// 2026 literature calls this multi-agent contagion — and the standard
+// in-context defenses share an attention substrate with the payload, so
+// the only robust handling is to track trust ACROSS the chain and refuse
+// to let a downstream agent treat upstream output as trusted once any
+// link is contaminated.
+//
+// `propagateTrust()` scans one hop (A → B) as `agent-output`, degrades
+// the effective trust tier on any warn/block, and keeps contamination
+// "sticky": pass the returned `hops` back as `priorChain` for the next
+// link so a poisoning at A still marks the C-hop as contaminated even if
+// C's own payload looks clean.
+// ============================================================
+
+export interface AgentHop {
+  /** The agent that PRODUCED the payload entering this hop. */
+  agentId: string;
+  /** Trust tier the payload was treated as at this hop. */
+  trust: TrustTier;
+  /** Scan decision for this hop's payload. */
+  decision: ScanDecision;
+  /** Violations found at this hop. */
+  violations: Violation[];
+}
+
+export interface PropagateTrustOptions {
+  /**
+   * Trust tier of the producing agent's output. Defaults to `untrusted` —
+   * agent output is attacker-influenceable by construction. Only set to
+   * `trusted` for an agent whose output you control end-to-end.
+   */
+  fromTrust?: TrustTier;
+  /**
+   * Chain returned by an earlier `propagateTrust()` call. Pass it to keep
+   * contamination sticky across A→B→C. Omit for the first link.
+   */
+  priorChain?: AgentHop[];
+  /** Ingestion-scanner strictness for the contagion scan. Default `high`. */
+  strictness?: "low" | "medium" | "high";
+}
+
+export interface TrustPropagationResult {
+  /** No contamination anywhere in the chain (including prior hops). */
+  safe: boolean;
+  /** Worst decision across the whole chain — sticky (once block, stays). */
+  decision: ScanDecision;
+  /**
+   * Trust tier the RECEIVING agent should treat the payload as. Degrades to
+   * `untrusted` the moment this hop — or any prior hop — warns or blocks.
+   */
+  effectiveTrust: TrustTier;
+  /** Full chain including this hop. Feed back as `priorChain` for the next. */
+  hops: AgentHop[];
+  /** Every violation across the chain, newest hop last. */
+  violations: Violation[];
+}
+
+/**
+ * Scan one agent-to-agent hand-off and propagate trust along the chain.
+ *
+ * @param payload      The producing agent's output (= consuming agent's input).
+ * @param fromAgentId  Agent that produced `payload`.
+ * @param toAgentId    Agent about to consume `payload`.
+ *
+ * @example
+ * ```ts
+ * import { propagateTrust } from "ai-shield-core";
+ *
+ * // A → B
+ * let chain = await propagateTrust(aOutput, "researcher", "planner");
+ * // B → C, contamination at A stays sticky through to C
+ * chain = await propagateTrust(bOutput, "planner", "executor", {
+ *   priorChain: chain.hops,
+ * });
+ * if (chain.effectiveTrust !== "trusted" && !chain.safe) {
+ *   // an upstream agent was poisoned — do not let the executor act on it
+ *   haltPipeline(chain.violations);
+ * }
+ * ```
+ */
+export async function propagateTrust(
+  payload: string,
+  fromAgentId: string,
+  toAgentId: string,
+  options: PropagateTrustOptions = {},
+): Promise<TrustPropagationResult> {
+  const fromTrust = options.fromTrust ?? "untrusted";
+  const priorChain = options.priorChain ?? [];
+
+  const scanner = new IngestionScanner({
+    strictness: options.strictness ?? "high",
+  });
+  const scanContext: ScanContext = {
+    source: "agent-output",
+    trustTier: fromTrust,
+    agentId: fromAgentId,
+  };
+  const scan = await scanner.scan(payload, scanContext);
+
+  const hopViolations: Violation[] = scan.violations.map((v) => ({
+    ...v,
+    detail: `${v.detail ?? ""} (${fromAgentId}→${toAgentId})`.trim(),
+  }));
+
+  // Was anything upstream already contaminated?
+  const upstreamWorst = priorChain.reduce<ScanDecision>(
+    (worst, h) => (priority(h.decision) > priority(worst) ? h.decision : worst),
+    "allow",
+  );
+  const upstreamContaminated = upstreamWorst !== "allow";
+
+  // This hop's own decision.
+  const hopDecision = scan.decision;
+
+  // Make contamination explicit as a multi-agent violation (distinct from
+  // the per-segment `ingested_injection` the scanner already produced).
+  if (hopDecision !== "allow") {
+    hopViolations.push({
+      type: "trust_propagation",
+      scanner: "trust-chain",
+      score: hopDecision === "block" ? 1.0 : 0.5,
+      threshold: 0.5,
+      message: `Contagion risk in hand-off ${fromAgentId}→${toAgentId}`,
+      detail: `Agent output flagged at this hop`,
+    });
+  } else if (upstreamContaminated) {
+    hopViolations.push({
+      type: "trust_propagation",
+      scanner: "trust-chain",
+      score: 0.5,
+      threshold: 0.5,
+      message: `Payload reaching ${toAgentId} originates from a contaminated chain`,
+      detail: `Upstream contamination is sticky across hops`,
+    });
+  }
+
+  const hop: AgentHop = {
+    agentId: fromAgentId,
+    trust: fromTrust,
+    decision: hopDecision,
+    violations: hopViolations,
+  };
+  const hops = [...priorChain, hop];
+
+  // Worst decision across the full chain (sticky).
+  const chainDecision: ScanDecision =
+    priority(hopDecision) >= priority(upstreamWorst)
+      ? hopDecision
+      : upstreamWorst;
+
+  // Effective trust degrades to untrusted on ANY contamination in the chain.
+  // A clean hand-off from a `trusted` agent with a clean chain stays trusted.
+  const effectiveTrust: TrustTier =
+    chainDecision === "allow" && fromTrust === "trusted"
+      ? "trusted"
+      : "untrusted";
+
+  return {
+    safe: chainDecision === "allow",
+    decision: chainDecision,
+    effectiveTrust,
+    hops,
+    violations: hops.flatMap((h) => h.violations),
+  };
+}

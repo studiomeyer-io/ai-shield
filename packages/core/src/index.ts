@@ -6,17 +6,33 @@
 export { AIShield } from "./shield.js";
 
 // Scanners (for custom chain building)
-export { HeuristicScanner, type HeuristicConfig } from "./scanner/heuristic.js";
+export {
+  HeuristicScanner,
+  normalizeForInjectionScan,
+  collapseSpacedLetters,
+  type HeuristicConfig,
+} from "./scanner/heuristic.js";
 export { PIIScanner } from "./scanner/pii.js";
 export { ScannerChain, type ChainConfig } from "./scanner/chain.js";
 export { injectCanary, checkCanaryLeak } from "./scanner/canary.js";
 export {
   IngestionScanner,
   scanIngested,
+  scanToolOutput,
   trustTierForSource,
+  tryDecodeObfuscation,
   type IngestionScannerConfig,
   type IngestionScanResult,
 } from "./scanner/ingestion.js";
+
+// Output scanning (v0.3) — OWASP LLM05 / LLM02 output side
+export {
+  OutputScanner,
+  scanOutput,
+  type OutputScanConfig,
+  type OutputScanResult,
+  type OutputSink,
+} from "./scanner/output.js";
 
 // Context / Trust-Tier
 export {
@@ -24,9 +40,23 @@ export {
   scanWrappedContext,
   assemblePrompt,
   flattenViolations,
+  propagateTrust,
   type WrapContextInput,
   type AssembleOptions,
+  type AgentHop,
+  type PropagateTrustOptions,
+  type TrustPropagationResult,
 } from "./context/wrap-context.js";
+
+// Async LLM-as-Judge (v0.3) — semantic detection, off the hot path
+export {
+  createAsyncJudge,
+  type AsyncJudge,
+  type AsyncJudgeConfig,
+  type JudgeVerdict,
+  type JudgeBackend,
+  type JudgeBackendLike,
+} from "./judge/async-judge.js";
 
 // Memory Canary / Persistence-Poisoning
 export {

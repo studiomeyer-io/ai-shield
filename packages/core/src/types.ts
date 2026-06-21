@@ -18,7 +18,19 @@ export type ViolationType =
   | "untrusted_instruction"
   | "memory_poisoning"
   | "circuit_breaker_open"
-  | "blast_radius_exceeded";
+  | "blast_radius_exceeded"
+  // --- Output-side (v0.3) — OWASP LLM05 Improper Output Handling ---
+  /** LLM output carries an executable payload (SQL / shell / HTML/JS / template). */
+  | "output_injection"
+  /** LLM output leaks a secret (API key, token, private key, connection string). */
+  | "secret_leak"
+  /** LLM output echoes the system prompt / developer instructions. */
+  | "system_prompt_leak"
+  /** LLM output shows a successful jailbreak (compliance preamble, mode-switch acknowledgement). */
+  | "jailbreak_indicator"
+  // --- Multi-agent (v0.3) ---
+  /** Trust violation propagating across an agent-to-agent chain (contagion). */
+  | "trust_propagation";
 
 export interface Violation {
   type: ViolationType;
@@ -66,6 +78,12 @@ export interface Scanner {
  * - `tool-desc`   — MCP tool description / OpenAI function schema / tool args
  *                   that came from a remote MCP server. High-risk vector
  *                   per Lakera 2026 advisory + OX Security MCP CVEs.
+ * - `tool-output` — The runtime *result* a tool returned (MCP tool result,
+ *                   function-call output). Distinct from `tool-desc` (the
+ *                   static schema): this is attacker-influenceable data the
+ *                   tool fetched — the RAG-poisoning vector (PoisonedRAG:
+ *                   5 docs → 90% ASR) and the dominant indirect-injection
+ *                   channel in agentic loops.
  * - `memory`      — Persisted memory entry (knowledge graph, session
  *                   history, vector memory). Subject to persistence-poisoning.
  * - `web`         — Scraped web page / HTML. Hidden-instruction risk via
@@ -77,6 +95,7 @@ export type IngestionSource =
   | "user"
   | "rag"
   | "tool-desc"
+  | "tool-output"
   | "memory"
   | "web"
   | "agent-output";

@@ -63,14 +63,39 @@ const SOURCE_PROFILE: Record<
     extraPatterns: [
       // "Before using this tool, you must ..." / "After calling, also call X"
       /(?:before|after|while)\s+(?:using|invoking|calling|executing)\s+(?:this\s+)?(?:tool|function|action)[,\s]+(?:you\s+)?(?:must|should|will|need\s+to|are\s+required\s+to)/i,
-      // "Also call delete_*" / "ALWAYS invoke X first"
-      /(?:also|always|first|then|finally)\s+(?:call|invoke|use|execute|run)\s+(?:the\s+)?[a-z_][\w-]{2,}/i,
+      // "Also call delete_account" / "then invoke query()". Tightened
+      // (review M2): the called symbol must carry a case-robust tool-name
+      // signal — a snake_case underscore or a `(` call — so benign docs prose
+      // ("first call the API", "then use the result") doesn't trip the
+      // block-level threshold and push operators into disabling the scanner.
+      // (camelCase detection was dropped: under the /i flag `[a-z]+[A-Z]`
+      // collapses to "any word" and re-introduced the false positive.)
+      /(?:also|always|first|then|finally)\s+(?:call|invoke|use|execute|run)\s+(?:the\s+)?[a-z][\w-]*(?:_[\w-]+|\s*\()/i,
       // "Tool description: ignore the above and ..."
       /(?:tool|function|action)\s+description[:\s]+(?:ignore|disregard|override)/i,
       // "Note to LLM:" / "Hidden instruction:"
       /(?:note|hidden\s+(?:instruction|directive|note))\s+to\s+(?:LLM|model|assistant|AI|agent)[:\s]/i,
       // Tool args carrying meta-instructions.
       /(?:on\s+(?:success|call)|when\s+invoked)[,:]\s+(?:silently|also|then)\s+(?:call|invoke|exfiltrate|send|leak)/i,
+    ],
+  },
+  "tool-output": {
+    // The runtime result a tool returned. Distinct from `tool-desc` (static
+    // schema): this is data the tool fetched and is therefore
+    // attacker-influenceable (PoisonedRAG, scraped pages surfaced through a
+    // search tool, a compromised upstream API). Tool results almost never
+    // legitimately carry instruction syntax aimed at the calling model, so
+    // the bar is as tight as RAG/tool-desc.
+    threshold: 0.13,
+    extraPatterns: [
+      // Result claims to carry instructions for the model.
+      /(?:tool|function|api|search|query)\s+(?:result|response|output)[:\s]+(?:ignore|disregard|override|new\s+instructions?|system\s+prompt)/i,
+      // "the result indicates you should now call/invoke X"
+      /(?:result|response|data|output)\s+(?:indicates?|says?|requires?|means?)\s+(?:that\s+)?you\s+(?:should|must|need\s+to|will)\s+(?:now\s+)?(?:call|invoke|run|execute|use)\s+[a-z_][\w-]{2,}/i,
+      // Embedded role/system marker inside a JSON-ish result value.
+      /"(?:role|system|instruction|directive)"\s*:\s*"(?:system|ignore|override|admin)/i,
+      // "(end of results) Now, as the system, ..."
+      /(?:end\s+of\s+(?:results?|output|data)|<\/results?>)[\s.)]*(?:now|next)[,\s]+(?:as\s+(?:the\s+)?(?:system|admin|assistant)|you\s+(?:must|should|will))/i,
     ],
   },
   memory: {
@@ -444,6 +469,55 @@ export async function scanIngested(
       ).length,
       cached: false,
     },
+  };
+}
+
+/**
+ * Scan the runtime *result* of a tool call before it re-enters the model
+ * context. The dominant indirect-injection channel in agentic loops: a
+ * search tool surfaces a poisoned page, an MCP server returns attacker-
+ * controlled data, a compromised upstream API embeds instructions in its
+ * response. PoisonedRAG (USENIX Security 2025) showed 5 planted documents
+ * reach a 90% attack-success rate in million-document knowledge bases —
+ * the payload arrives here, not in the user prompt.
+ *
+ * Thin wrapper over `scanIngested(content, "tool-output")` that also
+ * stamps the originating `toolName` into every violation detail, so an
+ * audit log can answer "which tool returned the poisoned content?".
+ *
+ * Pair with `CircuitBreakerRegistry` when you also want to rate-limit or
+ * trip the tool after repeated poisoned results:
+ *
+ * @example
+ * ```ts
+ * import { scanToolOutput } from "ai-shield-core";
+ *
+ * const result = await searchTool.call(query);          // untrusted
+ * const scan = await scanToolOutput("web_search", result);
+ * if (!scan.safe) {
+ *   // drop the result OR strip it before the next model turn
+ *   audit.warn("poisoned tool output", { tool: "web_search", v: scan.violations });
+ *   return; // do not feed `result` back into the model
+ * }
+ * model.continue(result);
+ * ```
+ */
+export async function scanToolOutput(
+  toolName: string,
+  content: string,
+  config: IngestionScannerConfig = {},
+): Promise<IngestionScanResult> {
+  const result = await scanIngested(content, "tool-output", config);
+  const safeToolName =
+    typeof toolName === "string" && toolName.length > 0
+      ? toolName.slice(0, 120)
+      : "unknown";
+  return {
+    ...result,
+    violations: result.violations.map((v) => ({
+      ...v,
+      detail: `${v.detail ?? ""} (tool=${safeToolName})`.trim(),
+    })),
   };
 }
 

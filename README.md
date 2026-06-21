@@ -18,9 +18,9 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 [![TypeScript](https://img.shields.io/badge/TypeScript-strict-blue.svg)](tsconfig.json)
 [![Zero Dependencies](https://img.shields.io/badge/dependencies-0-brightgreen.svg)](package.json)
-[![Tests: 567 passing](https://img.shields.io/badge/tests-567%20passing-brightgreen.svg)](tests/)
+[![Tests: 615 passing](https://img.shields.io/badge/tests-615%20passing-brightgreen.svg)](tests/)
 
-Prompt injection detection · Indirect-injection (RAG / tool-desc / memory / web) · PII protection · Trust-tier context streams · Memory poisoning detection · Tool policy enforcement · Circuit breakers · Cost tracking · Audit logging
+Prompt injection detection · Indirect-injection (RAG / tool-desc / tool-output / memory / web) · Output scanning (SQL / shell / XSS / secret leak) · PII protection · Trust-tier context streams · Multi-agent trust propagation · Memory poisoning detection · Tool policy enforcement · Circuit breakers · Async LLM-judge · Cost tracking · Audit logging
 
 [Quick Start](#quick-start) · [Indirect Injection](#indirect-injection-rag--tools--memory) · [Trust-Tier Context](#trust-tier-context-streams) · [Memory Canary](#memory-canary-persistence-poisoning) · [Circuit Breakers](#circuit-breakers-runtime-tool-guard) · [Injection Detection](#prompt-injection-detection) · [PII](#pii-detection) · [Tool Policy](#tool-policy) · [Presets](#policy-presets) · [Cost](#cost-tracking) · [Roadmap](#roadmap)
 
@@ -66,9 +66,9 @@ AI Shield runs in-process (not as a proxy), adds <25ms latency, and works with a
 
 ## Limitations
 
-- **Pattern-based, not ML-based.** Injection detection uses 40+ regex heuristics with score accumulation. Creative or novel attack patterns may bypass detection. An optional ML classifier (ONNX DeBERTa) is on the roadmap.
+- **Three detection layers, all optional past the first.** The heuristic chain is pattern-based (40+ regex with score accumulation) — fast and deterministic, but creative or novel phrasings may bypass it. For semantic coverage, compose the optional ONNX DeBERTa classifier (`ai-shield-classifier-onnx`) and/or the async LLM-judge (`createAsyncJudge`) on top.
 - **Token estimation is approximate.** The SDK wrappers estimate input tokens as `length * 0.75` for pre-flight budget checks. Actual token counts from the LLM response are used for cost recording.
-- **Not a replacement for output filtering.** AI Shield primarily scans *inputs*. Output scanning is supported in the streaming wrappers, but output-side safety (toxicity, hallucination, bias) requires additional tooling.
+- **Output scanning targets injection + leakage, not quality.** `scanOutput()` (v0.3) covers OWASP LLM05 (SQL/shell/XSS/template payloads), secret leaks, system-prompt leaks and output-side PII. Output *quality* — toxicity, hallucination, bias — still requires additional tooling.
 - **Custom patterns are limited to the `instruction_override` category.** Custom regex patterns added via `injection.customPatterns` are all assigned to the `instruction_override` category with a fixed weight of 0.25.
 - **PostgreSQL audit store is planned, not yet implemented.** The `store: "postgresql"` config option currently falls back to console logging. See the Roadmap section.
 
@@ -611,6 +611,78 @@ See [`packages/classifier-onnx/README.md`](packages/classifier-onnx/README.md) f
 
 ---
 
+## Output Scanning (v0.3)
+
+Input scanners answer "is this prompt safe to send?". `scanOutput()` answers the other half — "is this model output safe to act on, show, or forward?". It covers OWASP **LLM05 Improper Output Handling** and the output side of **LLM02 / LLM07**. Five checks: secret leak (keys / JWT / PEM / DSNs), output injection (SQL / shell / XSS / template), system-prompt leak (exact canary match + heuristic), jailbreak indicators, and output-side PII.
+
+```ts
+import { scanOutput } from "ai-shield-core";
+
+const reply = await llm.generate(prompt);
+const r = await scanOutput(reply, {
+  canaryTokens: canary,   // exact system-prompt-leak detection
+  sinks: ["sql"],         // only flag SQL-injection payloads (optional)
+});
+if (!r.safe) {
+  audit.warn("unsafe model output", r.violations);
+  return fallback();      // do NOT run r.sanitized as SQL
+}
+render(r.sanitized);      // PII masked, secrets redacted to [REDACTED_SECRET]
+```
+
+High-confidence checks (secrets, injection, canary leak) block; jailbreak and heuristic system-prompt-leak warn. Length-capped at 256 KB and ReDoS-safe.
+
+## Tool-Output Scanning (v0.3)
+
+The dominant indirect-injection channel in agentic loops is the *result* a tool returns — a search tool surfaces a poisoned page, an MCP server returns attacker-controlled data. (PoisonedRAG, USENIX Security 2025: 5 planted documents → 90% attack-success rate.) `scanToolOutput()` scans it with a dedicated `tool-output` profile and stamps the tool name into every violation.
+
+```ts
+import { scanToolOutput } from "ai-shield-core";
+
+const result = await searchTool.call(query);
+const scan = await scanToolOutput("web_search", result);
+if (!scan.safe) return;          // drop poisoned tool output, don't feed it back
+model.continue(result);
+```
+
+## Multi-Agent Trust Propagation (v0.3)
+
+When one agent's output becomes another's input, a successful injection propagates through the chain. `propagateTrust()` scans each hand-off, degrades trust to `untrusted` on contamination, and keeps it **sticky** across hops — a poisoning at A still flags the C-hop even if C's own payload looks clean.
+
+```ts
+import { propagateTrust } from "ai-shield-core";
+
+let chain = await propagateTrust(aOut, "researcher", "planner");
+chain = await propagateTrust(bOut, "planner", "executor", { priorChain: chain.hops });
+if (!chain.safe) haltPipeline(chain.violations);   // upstream contamination
+```
+
+## Async LLM-as-Judge (v0.3)
+
+Pattern matching and the ONNX classifier catch known shapes; an LLM judge catches novel obfuscation and paraphrase — but it's too slow for the critical path. `createAsyncJudge()` runs it in a parallel lane (BYO-backend, so the core stays zero-dependency) and degrades gracefully — a backend error or timeout yields an `"error"` verdict, never a throw.
+
+```ts
+import { createAsyncJudge } from "ai-shield-core";
+
+const judge = createAsyncJudge({
+  async backend(prompt) {
+    const r = await client.messages.create({
+      model: "claude-haiku-4-5", max_tokens: 128,
+      messages: [{ role: "user", content: prompt }],
+    });
+    return r.content[0]?.type === "text" ? r.content[0].text : "";
+  },
+  onVerdict: (v, input) => auditLog.record({ judge: v, input }),
+});
+
+// Fire alongside the deterministic scan — its latency never hits the request:
+const [scan] = await Promise.all([shield.scan(input), judge.evaluate(input)]);
+```
+
+With the heuristic chain + optional ONNX classifier + this judge, AI Shield spans all three detection layers — pattern, ML, and LLM-judge — in one zero-dependency core.
+
+---
+
 ## Scanner Chain
 
 Scanners run in sequence. Each scanner returns a decision (`allow`, `warn`, `block`). The chain escalates — highest decision wins. Early-exit on `block` is enabled by default.
@@ -1095,7 +1167,15 @@ Minimal by design. Core has zero runtime dependencies. Optional peer deps for Re
 
 ## Roadmap
 
-### Shipped in v0.2.0 (this release)
+### Shipped in v0.3.0 (this release)
+
+- [x] **Output scanning** (`scanOutput`) — OWASP LLM05: SQL/shell/XSS/template payloads, secret leaks, system-prompt leaks, output-side PII
+- [x] **Tool-output scanner** (`scanToolOutput`) — runtime tool-result indirect injection (`tool-output` source)
+- [x] **Multi-agent trust propagation** (`propagateTrust`) — sticky contagion tracking across agent chains
+- [x] **Async LLM-as-Judge** (`createAsyncJudge`) — semantic detection off the hot path, BYO-backend
+- [x] **Unicode / evasion hardening** — letter-splitting collapse, extended homoglyph map, adversarial-suffix signal
+
+### Shipped in v0.2.0
 
 - [x] LRU scan cache (TTL + LRU eviction)
 - [x] Streaming support (OpenAI + Anthropic + Gemini)
@@ -1109,7 +1189,6 @@ Minimal by design. Core has zero runtime dependencies. Optional peer deps for Re
 ### Next
 
 - [ ] `@google/genai` wrapper (new Gemini SDK, replacing `@google/generative-ai`)
-- [ ] LLM-as-Judge async verification
 - [ ] Bloom filter for known-good/bad inputs
 - [ ] PostgreSQL audit store (`store: "postgresql"` currently falls back to console)
 - [ ] Toxicity / bias detection

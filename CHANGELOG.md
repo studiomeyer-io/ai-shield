@@ -5,7 +5,68 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [0.3.0] — Output Scanning + Tool-Output + Async Judge + Multi-Agent Trust (2026-06-21)
+
+v0.2 closed the *input*-side indirect-injection gap. v0.3 closes the
+*output* side and the agentic-loop channels around it. The whole 2026 OSS
+LLM-security field is Python-only (LLM Guard, NeMo Guardrails, Guardrails
+AI); v0.3 keeps AI Shield the zero-dependency TypeScript answer.
+
+No breaking changes. All v0.1 / v0.2 APIs continue to work unchanged.
+
+### Added
+
+- **`scanOutput()` + `OutputScanner`** — output-side scanning for OWASP
+  **LLM05 Improper Output Handling** + **LLM02 Sensitive Information
+  Disclosure**. AI Shield previously scanned almost only inputs; this
+  answers "is this model *output* safe to act on / show / forward?". Five
+  checks: `secret_leak` (API keys, JWT, PEM, DSNs — redacted in
+  `sanitized`), `output_injection` (SQL / shell / HTML-JS / template
+  payloads, with an optional `sinks` filter), `system_prompt_leak`
+  (exact canary-token match + heuristic phrasing fallback),
+  `jailbreak_indicator`, and PII (reuses the input-side `PIIScanner`).
+  High-confidence checks block; jailbreak/heuristic-leak warn. Length-
+  capped (256 KB) and ReDoS-safe.
+- **`scanToolOutput(toolName, content)` + `tool-output` ingestion source** —
+  scans the runtime *result* a tool returned (MCP tool result, function
+  output), distinct from `tool-desc` (the static schema). This is the
+  dominant indirect-injection channel in agentic loops — PoisonedRAG
+  (USENIX Security 2025) reached a 90% attack-success rate with 5 planted
+  documents. Stamps the originating tool name into every violation for
+  audit.
+- **`propagateTrust(payload, from, to)` — multi-agent contagion tracking** —
+  scans an agent-to-agent hand-off as `agent-output`, degrades effective
+  trust to `untrusted` on any warn/block, and keeps contamination **sticky**
+  across hops (A→B→C): pass the returned `hops` back as `priorChain` so a
+  poisoning at A still flags the C-hop. Emits a dedicated `trust_propagation`
+  violation distinct from the per-segment `ingested_injection`.
+- **`createAsyncJudge()` — async LLM-as-Judge adapter** — semantic injection
+  detection off the hot path. BYO-backend (wrap your own Anthropic / OpenAI /
+  local-model call — the core stays zero-dependency). Run it in a parallel
+  lane alongside the deterministic scan so its latency never hits the
+  user-perceived path. Degrades gracefully: a backend error or timeout
+  yields an `"error"` verdict, never a throw. With the heuristic chain and
+  the optional ONNX classifier, AI Shield now spans all three detection
+  layers — pattern + ML + LLM-judge — in one zero-dependency core.
+- **Unicode / evasion hardening** — `collapseSpacedLetters()` un-splits
+  letter-splitting evasion (`i g n o r e` / `i.g.n.o.r.e` → `ignore`) and the
+  high-value override/role/extraction/tool rules are re-tested against the
+  collapsed form. Extended the homoglyph map (more Cyrillic / Greek /
+  Armenian look-alikes), and added a GCG-style **adversarial-suffix**
+  structural signal.
+
+### Changed
+
+- **`ViolationType` extended** with `output_injection`, `secret_leak`,
+  `system_prompt_leak`, `jailbreak_indicator`, `trust_propagation`. Existing
+  cases still match; callers that exhaustively switch on the union should add
+  the new arms.
+- **`IngestionSource` extended** with `tool-output`. Additive — existing
+  sources unchanged.
+- **Public exports** from `ai-shield-core` now include `scanOutput` /
+  `OutputScanner`, `scanToolOutput`, `propagateTrust`, `createAsyncJudge`,
+  plus `normalizeForInjectionScan`, `collapseSpacedLetters` and
+  `tryDecodeObfuscation` (previously internal) and all associated types.
 
 ### Fixed
 
@@ -18,6 +79,31 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   to `$1 / $5`, and repointed the `opus` / `sonnet` / `haiku` aliases plus a new
   `fable` alias. `cachedInputPer1M` recomputed at the ~10% cache-read rate
   throughout.
+
+### Tests
+
+- **+47 tests** (568 → **615**, all green, full suite ~1s): output-scanner
+  (15), tool-output (6), trust-propagation (15), async-judge (11). Zero `tsc`
+  errors across all six workspaces.
+
+### Migration
+
+No code changes required. To engage v0.3 defenses:
+
+```ts
+import { scanOutput, scanToolOutput, propagateTrust } from "ai-shield-core";
+
+// Before forwarding a model response to a SQL/HTML/shell sink:
+const out = await scanOutput(reply, { canaryTokens, sinks: ["sql"] });
+if (!out.safe) return fallback();
+
+// Before feeding a tool result back into the model:
+const t = await scanToolOutput("web_search", result);
+if (!t.safe) return; // drop poisoned tool output
+
+// At each agent-to-agent hand-off:
+chain = await propagateTrust(agentOut, "A", "B", { priorChain: chain?.hops });
+```
 
 ## [0.2.0] — Indirect-Injection + Trust-Tier + Memory Canary + Circuit Breakers (2026-05-20)
 

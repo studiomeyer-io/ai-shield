@@ -1,6 +1,6 @@
 {
   "name": "ai-shield-classifier-onnx",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "license": "MIT",
   "description": "Optional ONNX ML classifier for ai-shield — DeBERTa-style prompt-injection detection alongside heuristic patterns",
   "author": "StudioMeyer <hello@studiomeyer.io>",
@@ -37,14 +37,14 @@
     "typecheck": "tsc -b"
   },
   "peerDependencies": {
-    "ai-shield-core": "0.2.0",
+    "ai-shield-core": "0.3.0",
     "onnxruntime-node": ">=1.17.0"
   },
   "peerDependenciesMeta": {
     "onnxruntime-node": { "optional": true }
   },
   "devDependencies": {
-    "ai-shield-core": "0.2.0",
+    "ai-shield-core": "0.3.0",
     "typescript": "^5.7.0"
   },
   "engines": {

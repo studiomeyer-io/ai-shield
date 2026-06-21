@@ -1,6 +1,6 @@
 {
   "name": "ai-shield",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "description": "LLM Security for TypeScript — Prompt Injection Detection, PII Protection, Cost Control, Audit Trail",
   "author": "StudioMeyer <hello@studiomeyer.io>",
   "repository": {
