@@ -18,9 +18,9 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 [![TypeScript](https://img.shields.io/badge/TypeScript-strict-blue.svg)](tsconfig.json)
 [![Zero Dependencies](https://img.shields.io/badge/dependencies-0-brightgreen.svg)](package.json)
-[![Tests: 688 passing](https://img.shields.io/badge/tests-688%20passing-brightgreen.svg)](tests/)
+[![Tests: 710 passing](https://img.shields.io/badge/tests-710%20passing-brightgreen.svg)](tests/)
 
-Prompt injection detection · Indirect-injection (RAG / tool-desc / tool-output / memory / web) · Output scanning (SQL / shell / XSS / secret leak) · PII protection · Trust-tier context streams · Multi-agent trust propagation · Memory poisoning detection · Tool policy enforcement · Circuit breakers · Async LLM-judge · Cost tracking · Audit logging
+Prompt injection detection (incl. unicode-tag / leetspeak / typoglycemia / letter-splitting / multilingual evasion) · Indirect-injection (RAG / tool-desc / tool-output / memory / web) · Output scanning (SQL / shell / XSS / secret leak) · PII protection · Trust-tier context streams · Multi-agent trust propagation · Dual-LLM privilege separation · Memory poisoning detection · Tool policy enforcement · Circuit breakers · Async LLM-judge · Cost tracking · Audit logging
 
 [Quick Start](#quick-start) · [Indirect Injection](#indirect-injection-rag--tools--memory) · [Trust-Tier Context](#trust-tier-context-streams) · [Memory Canary](#memory-canary-persistence-poisoning) · [Circuit Breakers](#circuit-breakers-runtime-tool-guard) · [Injection Detection](#prompt-injection-detection) · [PII](#pii-detection) · [Tool Policy](#tool-policy) · [Presets](#policy-presets) · [Cost](#cost-tracking) · [Roadmap](#roadmap)
 
@@ -685,6 +685,37 @@ With the heuristic chain + optional ONNX classifier + this judge, AI Shield span
 
 ---
 
+## Dual-LLM Privilege Separation (v0.5)
+
+Pattern filters reduce risk; they don't eliminate indirect injection. The one architecturally robust mitigation (OWASP Prompt Injection Cheat Sheet 2026, Simon Willison's dual-LLM proposal) is privilege separation: **a model that can act must never directly read untrusted data, and a model that reads untrusted data must never act.**
+
+`createDualLLM()` enforces that split. The quarantined model (no tools) is the only thing that sees raw RAG chunks / tool output / scraped pages; its result is scanned (`scanIngested` bridge) and fenced before the privileged (tool-holding) model sees it. A flagged result is dropped, never forwarded.
+
+```ts
+import { createDualLLM, createActionScreener } from "ai-shield-core";
+
+const dual = createDualLLM({
+  privileged: (p) => toolModel.run(p),    // holds the tools
+  quarantined: (p) => plainModel.run(p),  // no tools — processes untrusted data
+});
+
+const r = await dual.quarantine(ragChunk, "Extract the order id as JSON.");
+// privileged model only ever sees the user request + scanned, fenced result:
+const answer = await dual.runPrivileged("Refund my last order.", [r]);
+
+// Action screening — gate a tool call against the user's ORIGINAL intent
+// (not the untrusted context that may have steered it). Fail-closed.
+const screener = createActionScreener({ judge: (p) => fast.run(p) });
+const v = await screener.screen("Summarize my inbox", "delete all emails");
+if (!v.allowed) abort(v.reason);   // deny / unparseable / error / timeout → blocked
+```
+
+## Typoglycemia Defense (v0.5)
+
+Scrambled-middle words ("ignroe pevrious instrcutions") read fine to an LLM but dodge literal patterns. `unscrambleForInjectionScan()` is a fourth lossy view (alongside leetspeak / letter-splitting / unicode-tag): a word that is an anagram of an injection keyword (same length + first/last letter + middle multiset) is folded back to the keyword and the high-value rules re-test. That's exactly classic Typoglycemia — a permuted middle — and it covers transpositions. Anagram-only is deliberate: edit-distance folding false-positived real word pairs ("forgot"→"forget", "rulers"→"rules"), so it was dropped (anagram matching is FP-free on a benign corpus). The `damerauLevenshtein()` utility is exported standalone for callers who want fuzzy matching with their own FP tolerance.
+
+---
+
 ## Scanner Chain
 
 Scanners run in sequence. Each scanner returns a decision (`allow`, `warn`, `block`). The chain escalates — highest decision wins. Early-exit on `block` is enabled by default.
@@ -1169,7 +1200,21 @@ Minimal by design. Core has zero runtime dependencies. Optional peer deps for Re
 
 ## Roadmap
 
-### Shipped in v0.3.0 (this release)
+### Shipped in v0.5.0 (this release)
+
+- [x] **Typoglycemia defense** (`unscrambleForInjectionScan` + `damerauLevenshtein`) — un-scrambles "ignroe pevrious instrcutions" via anagram-middle or single-edit fuzzy match, first+last gate keeps benign prose clean
+- [x] **Dual-LLM privilege separation** (`createDualLLM`) — privileged (tools) model never reads raw untrusted content; quarantined (no-tools) model processes it, results scanned + fenced, unsafe results dropped
+- [x] **Action screening** (`createActionScreener`) — fail-closed gate checking a tool call against the user's original intent
+
+### Shipped in v0.4.0
+
+- [x] **Unicode TAG-smuggling detection** (U+E0000–E007F de-tagging + standalone-tag signal)
+- [x] **Multilingual override detection** (DE/ES/FR `localized_override` category)
+- [x] **Policy-puppetry / fake-config detection** (HiddenLayer 2025 — DELIM-PP-1..5)
+- [x] **Leetspeak detection** (`leetDecodeForInjectionScan` lossy view)
+- [x] **Attack-corpus harness** (100% detection / 0% false-positive bar) + 2 bug fixes + 3 FP fixes
+
+### Shipped in v0.3.0
 
 - [x] **Output scanning** (`scanOutput`) — OWASP LLM05: SQL/shell/XSS/template payloads, secret leaks, system-prompt leaks, output-side PII
 - [x] **Tool-output scanner** (`scanToolOutput`) — runtime tool-result indirect injection (`tool-output` source)

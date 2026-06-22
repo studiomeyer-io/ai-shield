@@ -13,6 +13,8 @@ export {
   deTagForInjectionScan,
   hasTagChars,
   leetDecodeForInjectionScan,
+  unscrambleForInjectionScan,
+  damerauLevenshtein,
   type HeuristicConfig,
 } from "./scanner/heuristic.js";
 export { PIIScanner } from "./scanner/pii.js";
@@ -60,6 +62,19 @@ export {
   type JudgeBackend,
   type JudgeBackendLike,
 } from "./judge/async-judge.js";
+
+// Dual-LLM privilege separation + action screening (v0.5) — OWASP-recommended
+// architectural mitigation for indirect injection in agentic systems
+export {
+  createDualLLM,
+  createActionScreener,
+  type LLMBackend,
+  type DualLLMConfig,
+  type DualLLM,
+  type QuarantineResult,
+  type ActionScreenerConfig,
+  type ActionScreenResult,
+} from "./orchestration/dual-llm.js";
 
 // Memory Canary / Persistence-Poisoning
 export {

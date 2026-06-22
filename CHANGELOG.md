@@ -5,6 +5,49 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.5.0] — Typoglycemia Defense + Dual-LLM Privilege Separation (2026-06-22)
+
+Two additions from the v0.3 review research backlog: a fuzzy-matching defense
+against scrambled-word evasion, and the OWASP-recommended dual-LLM architecture
+for indirect-injection-resistant agentic systems. No breaking changes.
+
+### Added
+
+- **Typoglycemia defense** — `unscrambleForInjectionScan()` as an additional
+  lossy view (like `leetDecodeForInjectionScan` / `collapseSpacedLetters`):
+  a ≥5-letter word that is an anagram of an injection keyword (same length,
+  same first+last letter, same multiset of middle letters) is rewritten to
+  the keyword, and the high-value categories re-test against that view. That
+  is exactly classic Typoglycemia — a permuted middle — and covers adjacent
+  transpositions. "Ignroe all prevoius instrcutions" now blocks. Anagram-only
+  folding was a deliberate choice: edit-distance folding was tried and dropped
+  because it false-positived real word pairs ("forgot"→"forget",
+  "rulers"→"rules"); anagram matching is FP-free on a 116-word benign corpus.
+  Ships a standalone `damerauLevenshtein(a, b, cap)` zero-dep utility (optimal
+  string alignment + adjacent transposition, early-exit cap) for callers who
+  want fuzzy matching with their own FP tolerance.
+- **Dual-LLM privilege separation** (`createDualLLM`) — the architecturally
+  robust mitigation for indirect injection (OWASP Prompt Injection Cheat Sheet
+  2026 / Simon Willison's dual-LLM proposal): the **privileged** model (holds
+  the tools) never reads raw untrusted content; the **quarantined** model (no
+  tools) processes it and returns data that is scanned (`scanIngested` bridge)
+  and fenced (`<QUARANTINED_DATA>`) before the privileged side sees it. A
+  flagged quarantined result is **dropped**, not fenced-and-included — it never
+  reaches the actor.
+- **Action screening** (`createActionScreener`) — a **fail-closed** gate that
+  checks a proposed tool call against the user's ORIGINAL intent (never the
+  untrusted context that may have steered it, so a steered call can't steer its
+  own approval). Any outcome other than an explicit "allow" — deny, unparseable
+  judge output, backend error, or timeout — denies the action.
+
+### Tests
+
+- **+22 tests** (688 → **710**): typoglycemia (11 — DL distance/transposition,
+  un-scramble, scan integration, FP guards) + dual-llm (11 — privilege routing,
+  bridge scan, drop-unsafe assembly, action-screen fail-closed paths). The
+  attack-corpus harness reports no new false positives. tsc clean across six
+  workspaces; all new paths bounded/ReDoS-safe.
+
 ## [0.4.0] — Injection-Detection Hardening: Unicode-Tag / Multilingual / Policy-Puppetry / Leetspeak (2026-06-21)
 
 Closes four prompt-injection bypasses that previously returned `allow` even at

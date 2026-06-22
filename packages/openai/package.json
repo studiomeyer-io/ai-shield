@@ -1,6 +1,6 @@
 {
   "name": "ai-shield-openai",
-  "version": "0.4.0",
+  "version": "0.5.0",
   "license": "MIT",
   "description": "AI Shield wrapper for OpenAI SDK — automatic input/output scanning",
   "type": "module",
@@ -20,7 +20,7 @@
     "openai": ">=4.0.0"
   },
   "dependencies": {
-    "ai-shield-core": "0.4.0"
+    "ai-shield-core": "0.5.0"
   },
   "devDependencies": {
     "openai": "^4.77.0",
