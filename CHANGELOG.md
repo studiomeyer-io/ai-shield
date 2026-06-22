@@ -5,6 +5,62 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.4.0] — Injection-Detection Hardening: Unicode-Tag / Multilingual / Policy-Puppetry / Leetspeak (2026-06-21)
+
+Closes four prompt-injection bypasses that previously returned `allow` even at
+high strictness, plus two correctness bug fixes and three false-positive fixes.
+A new attack-corpus harness (24 labelled payloads + 17 benign controls) asserts
+the bar: 100% detection / 0% false-positive. No breaking changes.
+
+### Added
+
+- **Unicode TAG smuggling detection** (U+E0000–E007F) — `normalizeForInjectionScan`
+  de-tags (maps tag chars to their ASCII payload and re-scans); standalone /
+  smuggled invisible tag chars are themselves a violation (Rule TAG-001). New
+  `deTagForInjectionScan` / `hasTagChars` helpers; flag-emoji false-positive
+  guarded via `stripWellFormedTagSequences`.
+- **Multilingual override detection** (DE/ES/FR) — new `localized_override`
+  category (INJ-DE-1/2, INJ-ES-1, INJ-FR-1), matched on the NFKD-folded form and
+  gated on an override verb before the object noun so benign prose mentioning
+  "Anweisungen"/"instrucciones"/"instructions" stays allowed. The French rule is
+  scoped to French determiners so it can't double-fire on English.
+- **Policy-puppetry / fake-config detection** (HiddenLayer 2025) — DELIM-PP-1..5
+  cover interaction-config, allowed-modes, blocked-strings, fake privileged
+  `<role>`, and forged `<assistant>`/`<user>` transcript turns (forged-turn
+  detection requires an attack co-signal so lone benign transcripts pass).
+- **Leetspeak detection** — `leetDecodeForInjectionScan` as an additional lossy
+  view (0→o 1→i 3→e 4→a 5→s 7→t @→a $→s), scoped to high-value categories so
+  incidental numbers in benign prose ("buy 3 for 5 dollars") don't trip.
+- **Attack-corpus harness** (`tests/corpus/`) — runs labelled injection payloads
+  + benign controls through the HeuristicScanner at high strictness and asserts
+  0 false positives + ≥95% detection (current run: 24/24 caught, 17/17 clean).
+
+### Fixed
+
+- **`shield()` arg-routing** — the fragile `||`/`&&` key-sniff treated any object
+  with a string `preset` (and no `agentId`) as a `ShieldConfig`, so a real
+  `ScanContext` like `{ preset, source: "rag", userId }` was misread as config
+  and its ingestion-routing metadata silently dropped. Replaced with an
+  `isShieldConfig()` discriminant (context-only keys win, then config-only keys,
+  else default to context — lower blast radius).
+- **Secret scrub-on-block** — secret detection ran on the normalized output
+  (zero-width stripped) so a split key `sk-ant-…<ZWSP>…` blocked, but redaction
+  ran over the RAW output where the anchored pattern didn't match — leaving the
+  live key in `sanitized`. Added a scrub-on-block guarantee: if a matched
+  pattern still hits the normalized sanitized output, strip the invisible chars
+  so the key collapses and redact again. `sanitized` is now free of the live
+  secret regardless of the evasion used.
+- **Three false positives** closed without reopening bypasses — flag/subdivision
+  emoji (TAG-001), negated German ("Vergiss nicht …", INJ-DE-1), lone benign
+  transcript pair (DELIM-PP-5).
+
+### Tests
+
+- **+121 tests** (567 → **688**): unicode-evasion 12→25, heuristic-extended
+  15→19, +13 policy-puppetry, shield 13→16, output-scanner 14→17, plus the
+  corpus harness. All new regex paths ReDoS-safe (<100ms on 50–200KB worst
+  case). tsc clean across all six workspaces.
+
 ## [0.3.0] — Output Scanning + Tool-Output + Async Judge + Multi-Agent Trust (2026-06-21)
 
 v0.2 closed the *input*-side indirect-injection gap. v0.3 closes the

@@ -6,7 +6,7 @@
   "author": "StudioMeyer <hello@studiomeyer.io>",
   "repository": {
     "type": "git",
-    "url": "https://github.com/studiomeyer-io/ai-shield",
+    "url": "git+https://github.com/studiomeyer-io/ai-shield.git",
     "directory": "packages/classifier-onnx"
   },
   "homepage": "https://github.com/studiomeyer-io/ai-shield/tree/main/packages/classifier-onnx",
