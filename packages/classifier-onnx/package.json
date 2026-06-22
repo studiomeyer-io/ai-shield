@@ -1,6 +1,6 @@
 {
   "name": "ai-shield-classifier-onnx",
-  "version": "0.5.0",
+  "version": "0.5.1",
   "license": "MIT",
   "description": "Optional ONNX ML classifier for ai-shield — DeBERTa-style prompt-injection detection alongside heuristic patterns",
   "author": "StudioMeyer <hello@studiomeyer.io>",
@@ -24,6 +24,9 @@
     "ai-shield"
   ],
   "type": "module",
+  "files": [
+    "dist"
+  ],
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
   "exports": {

@@ -5,6 +5,25 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.5.1] — `ai-shield-classifier-onnx` packaging hotfix (2026-06-22)
+
+Single-package patch — `ai-shield-classifier-onnx` only. The other five
+packages are unaffected and stay at 0.5.0.
+
+### Fixed
+
+- **`ai-shield-classifier-onnx` shipped no `dist/`.** The published 0.5.0
+  tarball contained only `src/*.ts` + `tsconfig.json` while `main` / `types` /
+  `exports` pointed at `./dist/index.js` and `./dist/index.d.ts`, so
+  `import('ai-shield-classifier-onnx')` failed with `ERR_MODULE_NOT_FOUND` on a
+  clean install. Root cause: the package had no `files` allowlist, so
+  `npm pack` fell back to the monorepo `.gitignore` (which excludes `dist/`).
+  Added `"files": ["dist"]` — the allowlist takes precedence over `.gitignore`,
+  so the compiled output now ships and the raw TS source no longer does
+  (tarball: 5 source files → 8 dist files). No code or API change; the package
+  was simply uninstallable before. Other packages publish their `dist/`
+  correctly and were left untouched.
+
 ## [0.5.0] — Typoglycemia Defense + Dual-LLM Privilege Separation (2026-06-22)
 
 Two additions from the v0.3 review research backlog: a fuzzy-matching defense
