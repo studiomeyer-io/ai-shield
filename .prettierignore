@@ -1,0 +1,25 @@
+# Build output + deps
+dist/
+node_modules/
+coverage/
+*.tsbuildinfo
+
+# Generated / machine-managed
+package-lock.json
+
+# Detection core stays HAND-formatted (deliberate, load-bearing exclusion):
+# these files contain hand-aligned score-weight tables (0.30, 0.20, ...)
+# and hand-packed homoglyph/evasion maps. Prettier would strip trailing
+# zeros from numeric literals and explode the packed maps — token-level
+# changes we refuse inside the detection core. ESLint still lints them.
+packages/core/src/scanner/
+packages/core/src/policy/
+
+# Docs are deliberately NOT prettier-managed: README/CHANGELOG contain
+# hand-formatted tables and prompt-injection examples whose layout is
+# intentional. Reconsider as a separate change if wanted.
+*.md
+
+# CI workflow YAML stays hand-formatted (small, rarely touched).
+*.yml
+*.yaml

@@ -7,6 +7,30 @@ on:
     branches: [main]
 
 jobs:
+  lint:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Use Node.js 22
+        uses: actions/setup-node@v6
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      # Blocking on ERRORS only: eslint exits 0 while warnings remain, so the
+      # 9 known review-warnings (preserve-caught-error, unused vars in tests,
+      # `any` in test mocks) surface in the log without red-gating the build.
+      - name: Lint
+        run: npm run lint
+
+      - name: Format check
+        run: npm run format:check
+
   typecheck-and-test:
     runs-on: ubuntu-latest
     strategy:
