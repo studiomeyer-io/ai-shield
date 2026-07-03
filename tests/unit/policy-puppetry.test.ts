@@ -75,9 +75,9 @@ describe("HeuristicScanner — policy-puppetry / fake-config", () => {
       it(`allows: ${text.slice(0, 48)}`, async () => {
         const r = await med.scan(text, {});
         expect(r.decision).toBe("allow");
-        expect(
-          r.violations.some((v) => v.detail?.includes("DELIM-PP")),
-        ).toBe(false);
+        expect(r.violations.some((v) => v.detail?.includes("DELIM-PP"))).toBe(
+          false,
+        );
       });
     }
   });

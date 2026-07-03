@@ -102,7 +102,9 @@ describe("HeuristicScanner", () => {
       });
 
       const result = await custom.scan("magic word override please", {});
-      expect(result.violations.some((v) => v.detail?.includes("CUSTOM-1"))).toBe(true);
+      expect(
+        result.violations.some((v) => v.detail?.includes("CUSTOM-1")),
+      ).toBe(true);
     });
   });
 

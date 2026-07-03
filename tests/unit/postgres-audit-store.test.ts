@@ -57,9 +57,7 @@ function makeMockPool() {
 }
 
 function captureStderr() {
-  const spy = vi
-    .spyOn(process.stderr, "write")
-    .mockImplementation(() => true);
+  const spy = vi.spyOn(process.stderr, "write").mockImplementation(() => true);
   return {
     text: () => spy.mock.calls.map((call) => String(call[0])).join(""),
     lines: (marker: string) =>
@@ -115,15 +113,22 @@ describe("PostgresAuditStore — batched INSERT", () => {
 
     await store.writeBatch([
       makeRecord(),
-      makeRecord({ id: "22222222-2222-4222-8222-222222222222", agentId: "billing-bot" }),
+      makeRecord({
+        id: "22222222-2222-4222-8222-222222222222",
+        agentId: "billing-bot",
+      }),
     ]);
 
     expect(pool.query).toHaveBeenCalledTimes(1);
     const [text, values] = pool.query.mock.calls[0]!;
     expect(text).toMatch(/^INSERT INTO ai_shield_audit \(/);
     // 16 columns per record → placeholders $1..$32, two row groups.
-    expect(text).toContain("($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16)");
-    expect(text).toContain("($17, $18, $19, $20, $21, $22, $23, $24, $25, $26, $27, $28, $29, $30, $31, $32)");
+    expect(text).toContain(
+      "($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16)",
+    );
+    expect(text).toContain(
+      "($17, $18, $19, $20, $21, $22, $23, $24, $25, $26, $27, $28, $29, $30, $31, $32)",
+    );
     expect(values).toHaveLength(32);
     // Every column is a bind parameter — no record data inside the SQL text.
     expect(text).not.toContain("support-bot");
@@ -152,7 +157,9 @@ describe("PostgresAuditStore — batched INSERT", () => {
 
     expect(pool.query).toHaveBeenCalledTimes(1);
     const [text, values] = pool.query.mock.calls[0]!;
-    expect(text).toContain("VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16)");
+    expect(text).toContain(
+      "VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16)",
+    );
     expect(values).toHaveLength(16);
   });
 
@@ -216,7 +223,9 @@ describe("PostgresAuditStore — batched INSERT", () => {
     const store = new PostgresAuditStore({ pool, autoEnsureSchema: false });
 
     const records = Array.from({ length: 1001 }, (_, i) =>
-      makeRecord({ id: `00000000-0000-4000-8000-${String(i).padStart(12, "0")}` }),
+      makeRecord({
+        id: `00000000-0000-4000-8000-${String(i).padStart(12, "0")}`,
+      }),
     );
     await store.writeBatch(records);
 
@@ -289,7 +298,9 @@ describe("PostgresAuditStore — schema management", () => {
 
   it("explicit ensureSchema() throws on failure (fail-fast path)", async () => {
     const pool = makeMockPool();
-    pool.query.mockRejectedValueOnce(new Error("permission denied for schema public"));
+    pool.query.mockRejectedValueOnce(
+      new Error("permission denied for schema public"),
+    );
     const store = new PostgresAuditStore({ pool });
 
     await expect(store.ensureSchema()).rejects.toThrow(/permission denied/);
@@ -298,7 +309,9 @@ describe("PostgresAuditStore — schema management", () => {
   it("retries the schema DDL on a later write after a failure", async () => {
     const stderr = captureStderr();
     const pool = makeMockPool();
-    pool.query.mockRejectedValueOnce(new Error("permission denied for schema public"));
+    pool.query.mockRejectedValueOnce(
+      new Error("permission denied for schema public"),
+    );
     const store = new PostgresAuditStore({ pool });
 
     // First write: DDL fails → batch dropped, warned, no throw.
@@ -317,7 +330,9 @@ describe("PostgresAuditStore — failures never reach the caller", () => {
   it("swallows write failures and warns once on stderr", async () => {
     const stderr = captureStderr();
     const pool = makeMockPool();
-    pool.query.mockRejectedValue(new Error("connection terminated unexpectedly"));
+    pool.query.mockRejectedValue(
+      new Error("connection terminated unexpectedly"),
+    );
     const store = new PostgresAuditStore({ pool, autoEnsureSchema: false });
 
     await expect(
@@ -445,7 +460,9 @@ describe("PostgresAuditStore — lazy pg import (config-based)", () => {
       pgImport: async () => ({ notPg: true }),
     });
 
-    await expect(store.init()).rejects.toThrow(/did not expose a Pool constructor/);
+    await expect(store.init()).rejects.toThrow(
+      /did not expose a Pool constructor/,
+    );
   });
 });
 
@@ -484,9 +501,7 @@ describe("AIShield — audit store wiring", () => {
       audit: { store: "postgresql" },
     });
 
-    expect(
-      stderr.lines("falling back to console audit store"),
-    ).toHaveLength(1);
+    expect(stderr.lines("falling back to console audit store")).toHaveLength(1);
 
     const result = await shield.scan("hello world");
     expect(result.decision).toBe("allow");
@@ -512,7 +527,10 @@ describe("AIShield — audit store wiring", () => {
     const store = new PostgresAuditStore({ pool, autoEnsureSchema: false });
     const shield = new AIShield({ audit: { store } });
 
-    await shield.scan(RAW_INPUT, { userId: RAW_USER_ID, agentId: "support-bot" });
+    await shield.scan(RAW_INPUT, {
+      userId: RAW_USER_ID,
+      agentId: "support-bot",
+    });
     await shield.close(); // flushes the logger → single batched INSERT
 
     expect(pool.query).toHaveBeenCalledTimes(1);

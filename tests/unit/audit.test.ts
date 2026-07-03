@@ -1,5 +1,8 @@
 import { describe, it, expect, afterEach } from "vitest";
-import { AuditLogger, MemoryAuditStore } from "../../packages/core/src/audit/logger.js";
+import {
+  AuditLogger,
+  MemoryAuditStore,
+} from "../../packages/core/src/audit/logger.js";
 import type { ScanResult } from "../../packages/core/src/types.js";
 
 function makeScanResult(overrides: Partial<ScanResult> = {}): ScanResult {
@@ -8,7 +11,11 @@ function makeScanResult(overrides: Partial<ScanResult> = {}): ScanResult {
     decision: "allow",
     sanitized: "test input",
     violations: [],
-    meta: { scanDurationMs: 1.5, scannersRun: ["heuristic", "pii"], cached: false },
+    meta: {
+      scanDurationMs: 1.5,
+      scannersRun: ["heuristic", "pii"],
+      cached: false,
+    },
     ...overrides,
   };
 }
@@ -102,17 +109,22 @@ describe("AuditLogger", () => {
       const store = new MemoryAuditStore();
       logger = new AuditLogger({ store, flushIntervalMs: 60000 });
 
-      await logger.log("test", makeScanResult({
-        decision: "block",
-        safe: false,
-        violations: [{
-          type: "prompt_injection",
-          scanner: "heuristic",
-          score: 0.8,
-          threshold: 0.3,
-          message: "Injection detected",
-        }],
-      }));
+      await logger.log(
+        "test",
+        makeScanResult({
+          decision: "block",
+          safe: false,
+          violations: [
+            {
+              type: "prompt_injection",
+              scanner: "heuristic",
+              score: 0.8,
+              threshold: 0.3,
+              message: "Injection detected",
+            },
+          ],
+        }),
+      );
       await logger.flush();
 
       const record = store.records[0]!;
@@ -125,12 +137,17 @@ describe("AuditLogger", () => {
       const store = new MemoryAuditStore();
       logger = new AuditLogger({ store, flushIntervalMs: 60000 });
 
-      await logger.log("test", makeScanResult(), {}, {
-        model: "gpt-4o",
-        outputTokenCount: 150,
-        toolsCalled: ["search_knowledge"],
-        costUsd: 0.003,
-      });
+      await logger.log(
+        "test",
+        makeScanResult(),
+        {},
+        {
+          model: "gpt-4o",
+          outputTokenCount: 150,
+          toolsCalled: ["search_knowledge"],
+          costUsd: 0.003,
+        },
+      );
       await logger.flush();
 
       const record = store.records[0]!;
@@ -170,7 +187,11 @@ describe("AuditLogger", () => {
   describe("close", () => {
     it("flushes remaining records on close", async () => {
       const store = new MemoryAuditStore();
-      logger = new AuditLogger({ store, batchSize: 100, flushIntervalMs: 60000 });
+      logger = new AuditLogger({
+        store,
+        batchSize: 100,
+        flushIntervalMs: 60000,
+      });
 
       await logger.log("a", makeScanResult());
       await logger.log("b", makeScanResult());

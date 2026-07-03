@@ -32,8 +32,12 @@ describe("PolicyEngine", () => {
       const int = new PolicyEngine("internal_support");
       const ops = new PolicyEngine("ops_agent");
 
-      expect(pub.getInjectionThreshold()).toBeLessThan(int.getInjectionThreshold());
-      expect(int.getInjectionThreshold()).toBeLessThan(ops.getInjectionThreshold());
+      expect(pub.getInjectionThreshold()).toBeLessThan(
+        int.getInjectionThreshold(),
+      );
+      expect(int.getInjectionThreshold()).toBeLessThan(
+        ops.getInjectionThreshold(),
+      );
     });
   });
 
@@ -80,7 +84,9 @@ describe("PolicyEngine", () => {
       const pub = new PolicyEngine("public_website");
       const ops = new PolicyEngine("ops_agent");
 
-      expect(pub.getMaxToolChainDepth()).toBeLessThan(ops.getMaxToolChainDepth());
+      expect(pub.getMaxToolChainDepth()).toBeLessThan(
+        ops.getMaxToolChainDepth(),
+      );
     });
   });
 

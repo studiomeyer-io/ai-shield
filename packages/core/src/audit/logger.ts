@@ -53,16 +53,20 @@ export class AuditLogger {
       sessionId: context.sessionId,
       agentId: context.agentId,
       userIdHash: context.userId
-        ? createHash("sha256").update(context.userId).digest("hex").substring(0, 32)
+        ? createHash("sha256")
+            .update(context.userId)
+            .digest("hex")
+            .substring(0, 32)
         : undefined,
       requestType: context.tools?.length ? "tool_call" : "chat",
       inputHash: createHash("sha256").update(input).digest("hex"),
       inputTokenCount: Math.ceil(input.length / 4), // rough estimate
       model: extra.model,
       securityDecision: result.decision,
-      securityReason: result.violations.length > 0
-        ? result.violations.map((v) => v.message).join("; ")
-        : undefined,
+      securityReason:
+        result.violations.length > 0
+          ? result.violations.map((v) => v.message).join("; ")
+          : undefined,
       violations: result.violations,
       scanDurationMs: result.meta.scanDurationMs,
       outputTokenCount: extra.outputTokenCount,
@@ -107,14 +111,24 @@ export class ConsoleAuditStore implements AuditStore {
     for (const record of records) this.print(record);
   }
 
-  async flush(): Promise<void> { /* noop */ }
-  async close(): Promise<void> { /* noop */ }
+  async flush(): Promise<void> {
+    /* noop */
+  }
+  async close(): Promise<void> {
+    /* noop */
+  }
 
   private print(record: AuditRecord): void {
-    const icon = record.securityDecision === "block" ? "BLOCK" : record.securityDecision === "warn" ? "WARN " : "ALLOW";
-    const violations = record.violations.length > 0
-      ? ` [${record.violations.map((v) => v.message).join(", ")}]`
-      : "";
+    const icon =
+      record.securityDecision === "block"
+        ? "BLOCK"
+        : record.securityDecision === "warn"
+          ? "WARN "
+          : "ALLOW";
+    const violations =
+      record.violations.length > 0
+        ? ` [${record.violations.map((v) => v.message).join(", ")}]`
+        : "";
     // Using stderr to not interfere with application output
     process.stderr.write(
       `[AI-Shield] ${icon} | ${record.scanDurationMs.toFixed(1)}ms | agent=${record.agentId ?? "-"} | ${record.inputHash.substring(0, 8)}...${violations}\n`,
@@ -135,6 +149,10 @@ export class MemoryAuditStore implements AuditStore {
     this.records.push(...records);
   }
 
-  async flush(): Promise<void> { /* noop */ }
-  async close(): Promise<void> { /* noop */ }
+  async flush(): Promise<void> {
+    /* noop */
+  }
+  async close(): Promise<void> {
+    /* noop */
+  }
 }

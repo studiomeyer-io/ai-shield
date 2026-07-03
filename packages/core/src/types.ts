@@ -192,10 +192,7 @@ export interface MemoryCanaryEntry {
 export interface MemoryCanaryVerification {
   valid: boolean;
   reason?:
-    | "content_mutated"
-    | "canary_missing"
-    | "tenant_mismatch"
-    | "hash_mismatch";
+    "content_mutated" | "canary_missing" | "tenant_mismatch" | "hash_mismatch";
   /** When invalid: the mutated content actually read. */
   observed?: string;
 }
@@ -236,10 +233,7 @@ export interface CircuitBreakerDecision {
   state: CircuitState;
   /** Reason if `allowed = false`. */
   reason?:
-    | "circuit_open"
-    | "rate_limit"
-    | "blast_radius_exceeded"
-    | "hitl_denied";
+    "circuit_open" | "rate_limit" | "blast_radius_exceeded" | "hitl_denied";
   /** Detail for logs. */
   message?: string;
   /** Suggested retry-after in ms when state = open. */

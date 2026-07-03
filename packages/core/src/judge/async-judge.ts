@@ -47,8 +47,7 @@ export interface JudgeBackend {
 
 /** Either a structured backend or a bare completion function. */
 export type JudgeBackendLike =
-  | JudgeBackend
-  | ((prompt: string) => Promise<string>);
+  JudgeBackend | ((prompt: string) => Promise<string>);
 
 export interface AsyncJudgeConfig {
   /** Your judge-model caller. Use a small, fast model (e.g. Haiku, a 22M
@@ -115,9 +114,7 @@ function defaultPrompt(input: string, context?: ScanContext): string {
 }
 
 /** Tolerant parser for the default prompt's response shape. */
-function defaultParse(
-  raw: string,
-): Omit<JudgeVerdict, "durationMs" | "raw"> {
+function defaultParse(raw: string): Omit<JudgeVerdict, "durationMs" | "raw"> {
   const verdictMatch = /VERDICT:\s*(malicious|suspicious|benign)/i.exec(raw);
   const confMatch = /CONFIDENCE:\s*(0?\.\d+|1(?:\.0+)?|0|1)/i.exec(raw);
   const reasonMatch = /REASON:\s*(.+)/i.exec(raw);

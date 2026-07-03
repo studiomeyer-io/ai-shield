@@ -1,8 +1,5 @@
 import { randomBytes, createHash, timingSafeEqual } from "node:crypto";
-import type {
-  MemoryCanaryEntry,
-  MemoryCanaryVerification,
-} from "../types.js";
+import type { MemoryCanaryEntry, MemoryCanaryVerification } from "../types.js";
 
 // ============================================================
 // Memory Canary — Persistence-Poisoning Detection
@@ -127,10 +124,7 @@ export function verifyMemoryCanary(
   // omits `options.tenantId` against a tenant-bound entry surfaces as
   // a leak rather than a silent pass (Critic C2 from round 1 review).
   if (entry.tenantId !== undefined) {
-    if (
-      options.tenantId === undefined ||
-      options.tenantId !== entry.tenantId
-    ) {
+    if (options.tenantId === undefined || options.tenantId !== entry.tenantId) {
       return {
         valid: false,
         reason: "tenant_mismatch",
@@ -210,7 +204,10 @@ export function bulkVerify(
     observedContent: string;
     expectedTenantId?: string;
   }>,
-): Array<{ id: string; reason: NonNullable<MemoryCanaryVerification["reason"]> }> {
+): Array<{
+  id: string;
+  reason: NonNullable<MemoryCanaryVerification["reason"]>;
+}> {
   const failures: Array<{
     id: string;
     reason: NonNullable<MemoryCanaryVerification["reason"]>;

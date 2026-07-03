@@ -91,9 +91,9 @@ export interface OnnxClassifierConfig {
 
 export class OnnxInjectionScanner implements Scanner {
   readonly name = "onnx-classifier";
-  private readonly cfg: Required<
-    Omit<OnnxClassifierConfig, "outputName">
-  > & { outputName?: string };
+  private readonly cfg: Required<Omit<OnnxClassifierConfig, "outputName">> & {
+    outputName?: string;
+  };
 
   constructor(config: OnnxClassifierConfig) {
     if (!config.session) {
@@ -108,8 +108,7 @@ export class OnnxInjectionScanner implements Scanner {
       threshold: config.threshold ?? 0.85,
       outputName: config.outputName,
       injectionClassIndex: config.injectionClassIndex ?? 1,
-      maxLength:
-        config.maxLength ?? config.tokenizer.modelMaxLength ?? 512,
+      maxLength: config.maxLength ?? config.tokenizer.modelMaxLength ?? 512,
     };
   }
 
@@ -261,7 +260,11 @@ export async function loadOnnxClassifier(opts: {
         `Underlying error: ${(err as Error).message}`,
     );
   }
-  const ortModule = (ort as { InferenceSession?: { create?: (path: string) => Promise<OnnxInferenceRuntime> } });
+  const ortModule = ort as {
+    InferenceSession?: {
+      create?: (path: string) => Promise<OnnxInferenceRuntime>;
+    };
+  };
   const create = ortModule.InferenceSession?.create;
   if (typeof create !== "function") {
     throw new Error(
@@ -292,16 +295,18 @@ function sanitizeOnnxErrorMessage(message: string): string {
   }
   // Truncate before sanitizing — bounded work on adversarial input.
   const truncated = message.length > 500 ? message.slice(0, 500) : message;
-  return truncated
-    // POSIX absolute paths
-    .replace(/(?:^|[\s(])(\/[\w./@-]+)/g, " [path]")
-    // Windows drive paths
-    .replace(/[A-Za-z]:\\[\\\w./@-]+/g, "[path]")
-    // file:// URLs
-    .replace(/file:\/\/\S+/g, "[file-url]")
-    // Memory addresses (0x...)
-    .replace(/0x[0-9a-fA-F]{6,}/g, "[addr]")
-    .trim();
+  return (
+    truncated
+      // POSIX absolute paths
+      .replace(/(?:^|[\s(])(\/[\w./@-]+)/g, " [path]")
+      // Windows drive paths
+      .replace(/[A-Za-z]:\\[\\\w./@-]+/g, "[path]")
+      // file:// URLs
+      .replace(/file:\/\/\S+/g, "[file-url]")
+      // Memory addresses (0x...)
+      .replace(/0x[0-9a-fA-F]{6,}/g, "[addr]")
+      .trim()
+  );
 }
 
 function softmax(logits: number[]): number[] {

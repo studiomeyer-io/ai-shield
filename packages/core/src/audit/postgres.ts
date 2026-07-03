@@ -236,7 +236,11 @@ export class PostgresAuditStore implements AuditStore {
     try {
       const pool = await this.resolvePool();
       if (this.autoEnsureSchema) await this.ensureSchema();
-      for (let offset = 0; offset < records.length; offset += MAX_ROWS_PER_INSERT) {
+      for (
+        let offset = 0;
+        offset < records.length;
+        offset += MAX_ROWS_PER_INSERT
+      ) {
         const chunk = records.slice(offset, offset + MAX_ROWS_PER_INSERT);
         const { text, values } = buildInsert(chunk);
         await pool.query(text, values);

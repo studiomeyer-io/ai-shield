@@ -50,9 +50,14 @@ describe("propagateTrust — multi-agent contagion", () => {
   });
 
   it("a clean chain from a trusted agent stays trusted", async () => {
-    const r = await propagateTrust("verified internal summary", "kb", "planner", {
-      fromTrust: "trusted",
-    });
+    const r = await propagateTrust(
+      "verified internal summary",
+      "kb",
+      "planner",
+      {
+        fromTrust: "trusted",
+      },
+    );
     expect(r.safe).toBe(true);
     expect(r.effectiveTrust).toBe("trusted");
   });
@@ -68,6 +73,8 @@ describe("propagateTrust — multi-agent contagion", () => {
       "alpha",
       "beta",
     );
-    expect(r.violations.some((v) => v.detail?.includes("alpha→beta"))).toBe(true);
+    expect(r.violations.some((v) => v.detail?.includes("alpha→beta"))).toBe(
+      true,
+    );
   });
 });

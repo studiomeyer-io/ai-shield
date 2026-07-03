@@ -1,22 +1,35 @@
 import { describe, it, expect } from "vitest";
 import { ScannerChain } from "../../packages/core/src/scanner/chain.js";
-import type { Scanner, ScannerResult, ScanContext } from "../../packages/core/src/types.js";
+import type {
+  Scanner,
+  ScannerResult,
+  ScanContext,
+} from "../../packages/core/src/types.js";
 
 // --- Mock scanners ---
 
-function mockScanner(name: string, decision: "allow" | "warn" | "block", sanitized?: string): Scanner {
+function mockScanner(
+  name: string,
+  decision: "allow" | "warn" | "block",
+  sanitized?: string,
+): Scanner {
   return {
     name,
     async scan(_input: string, _ctx: ScanContext): Promise<ScannerResult> {
       return {
         decision,
-        violations: decision !== "allow" ? [{
-          type: "prompt_injection",
-          scanner: name,
-          score: decision === "block" ? 1.0 : 0.5,
-          threshold: 0.3,
-          message: `${name} flagged`,
-        }] : [],
+        violations:
+          decision !== "allow"
+            ? [
+                {
+                  type: "prompt_injection",
+                  scanner: name,
+                  score: decision === "block" ? 1.0 : 0.5,
+                  threshold: 0.3,
+                  message: `${name} flagged`,
+                },
+              ]
+            : [],
         sanitized,
         durationMs: 0.1,
       };

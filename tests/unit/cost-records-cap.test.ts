@@ -42,9 +42,9 @@ describe("CostTracker record retention", () => {
   });
 
   it("clearRecords() empties the ring buffer without affecting budgets", async () => {
-    const tracker = new CostTracker(
-      { "agent-a": { softLimit: 10, hardLimit: 100, period: "daily" } },
-    );
+    const tracker = new CostTracker({
+      "agent-a": { softLimit: 10, hardLimit: 100, period: "daily" },
+    });
     await tracker.recordCost("agent-a", "gpt-4o-mini", 1_000, 500);
     tracker.clearRecords();
     expect(tracker.getRecords().length).toBe(0);

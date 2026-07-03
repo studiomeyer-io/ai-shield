@@ -58,5 +58,7 @@ app.post("/api/chat", (req, res) => {
 const PORT = 3333;
 app.listen(PORT, () => {
   console.log(`AI Shield Express example running on http://localhost:${PORT}`);
-  console.log(`Try: curl -X POST http://localhost:${PORT}/api/chat -H "Content-Type: application/json" -d '{"message": "Hello!"}'`);
+  console.log(
+    `Try: curl -X POST http://localhost:${PORT}/api/chat -H "Content-Type: application/json" -d '{"message": "Hello!"}'`,
+  );
 });

@@ -147,26 +147,44 @@ describe("CircuitBreakerRegistry", () => {
     });
 
     it("records call timestamp — inspect() shows callsInWindow increased", async () => {
-      reg.configure({ tool: "get_thing", scope: makeBreakerScope("agent-a", "session-1") });
+      reg.configure({
+        tool: "get_thing",
+        scope: makeBreakerScope("agent-a", "session-1"),
+      });
       await reg.check(callOf("get_thing"), ctx());
       await reg.check(callOf("get_thing"), ctx());
-      const snap = reg.inspect("get_thing", makeBreakerScope("agent-a", "session-1"));
+      const snap = reg.inspect(
+        "get_thing",
+        makeBreakerScope("agent-a", "session-1"),
+      );
       expect(snap).not.toBeNull();
       expect(snap!.callsInWindow).toBe(2);
     });
 
     it("records write timestamp for destructive tools — inspect() shows writesInWindow", async () => {
-      reg.configure({ tool: "delete_user", scope: makeBreakerScope("agent-a", "session-1") });
+      reg.configure({
+        tool: "delete_user",
+        scope: makeBreakerScope("agent-a", "session-1"),
+      });
       await reg.check(callOf("delete_user"), ctx());
-      const snap = reg.inspect("delete_user", makeBreakerScope("agent-a", "session-1"));
+      const snap = reg.inspect(
+        "delete_user",
+        makeBreakerScope("agent-a", "session-1"),
+      );
       expect(snap).not.toBeNull();
       expect(snap!.callsInWindow).toBe(1);
       expect(snap!.writesInWindow).toBe(1);
     });
 
     it("isolates different scopes — same tool, different agentId+sessionId", async () => {
-      reg.configure({ tool: "do_thing", scope: makeBreakerScope("agent-a", "session-1") });
-      reg.configure({ tool: "do_thing", scope: makeBreakerScope("agent-b", "session-2") });
+      reg.configure({
+        tool: "do_thing",
+        scope: makeBreakerScope("agent-a", "session-1"),
+      });
+      reg.configure({
+        tool: "do_thing",
+        scope: makeBreakerScope("agent-b", "session-2"),
+      });
       await reg.check(callOf("do_thing"), {
         agentId: "agent-a",
         sessionId: "session-1",
@@ -180,8 +198,14 @@ describe("CircuitBreakerRegistry", () => {
         sessionId: "session-2",
       });
 
-      const aSnap = reg.inspect("do_thing", makeBreakerScope("agent-a", "session-1"));
-      const bSnap = reg.inspect("do_thing", makeBreakerScope("agent-b", "session-2"));
+      const aSnap = reg.inspect(
+        "do_thing",
+        makeBreakerScope("agent-a", "session-1"),
+      );
+      const bSnap = reg.inspect(
+        "do_thing",
+        makeBreakerScope("agent-b", "session-2"),
+      );
       expect(aSnap!.callsInWindow).toBe(2);
       expect(bSnap!.callsInWindow).toBe(1);
     });
@@ -205,7 +229,10 @@ describe("CircuitBreakerRegistry", () => {
       // All four calls hit different scope keys but share the same
       // empty-scope config (fallback lookup). Inspect them via the
       // exact scope strings the impl uses.
-      expect(reg.inspect("scoped_tool", makeBreakerScope("agent-a", "session-1"))!.callsInWindow).toBe(1);
+      expect(
+        reg.inspect("scoped_tool", makeBreakerScope("agent-a", "session-1"))!
+          .callsInWindow,
+      ).toBe(1);
       expect(reg.inspect("scoped_tool", "agent-a")!.callsInWindow).toBe(1);
       expect(reg.inspect("scoped_tool", "session-1")!.callsInWindow).toBe(1);
       expect(reg.inspect("scoped_tool", "")!.callsInWindow).toBe(1);
@@ -642,14 +669,20 @@ describe("CircuitBreakerRegistry", () => {
 
     it("inspect() returns state + counts after activity", async () => {
       const reg = new CircuitBreakerRegistry([
-        { tool: "delete_user", scope: makeBreakerScope("agent-a", "session-1") },
+        {
+          tool: "delete_user",
+          scope: makeBreakerScope("agent-a", "session-1"),
+        },
       ]);
       const c: ScanContext = { agentId: "agent-a", sessionId: "session-1" };
       await reg.check(callOf("delete_user"), c);
       await reg.check(callOf("delete_user"), c);
       reg.recordFailure("delete_user", c);
 
-      const snap = reg.inspect("delete_user", makeBreakerScope("agent-a", "session-1"));
+      const snap = reg.inspect(
+        "delete_user",
+        makeBreakerScope("agent-a", "session-1"),
+      );
       expect(snap).not.toBeNull();
       expect(snap!.state).toBe("closed");
       expect(snap!.callsInWindow).toBe(2);
@@ -659,9 +692,9 @@ describe("CircuitBreakerRegistry", () => {
 
     it("violationType() maps decisions correctly", () => {
       const T = CircuitBreakerRegistry.violationType;
-      expect(
-        T({ allowed: false, state: "open", reason: "circuit_open" }),
-      ).toBe("circuit_breaker_open");
+      expect(T({ allowed: false, state: "open", reason: "circuit_open" })).toBe(
+        "circuit_breaker_open",
+      );
       expect(
         T({
           allowed: false,
@@ -669,9 +702,9 @@ describe("CircuitBreakerRegistry", () => {
           reason: "blast_radius_exceeded",
         }),
       ).toBe("blast_radius_exceeded");
-      expect(
-        T({ allowed: false, state: "closed", reason: "rate_limit" }),
-      ).toBe("tool_rate_limit");
+      expect(T({ allowed: false, state: "closed", reason: "rate_limit" })).toBe(
+        "tool_rate_limit",
+      );
       expect(
         T({ allowed: false, state: "closed", reason: "hitl_denied" }),
       ).toBe("tool_denied");

@@ -26,7 +26,9 @@ import type { LanguageModelMiddleware } from "ai";
 // Single source of truth is the `ai` peer dependency; no direct
 // dependency on `@ai-sdk/provider` needed.
 
-type TransformParamsHook = NonNullable<LanguageModelMiddleware["transformParams"]>;
+type TransformParamsHook = NonNullable<
+  LanguageModelMiddleware["transformParams"]
+>;
 type WrapGenerateHook = NonNullable<LanguageModelMiddleware["wrapGenerate"]>;
 type WrapStreamHook = NonNullable<LanguageModelMiddleware["wrapStream"]>;
 
@@ -40,9 +42,13 @@ type ShieldGenerateResult = Awaited<ReturnType<WrapGenerateHook>>;
 type ShieldStreamResult = Awaited<ReturnType<WrapStreamHook>>;
 /** `LanguageModelV4StreamPart` */
 type ShieldStreamPart =
-  ShieldStreamResult["stream"] extends ReadableStream<infer TPart> ? TPart : never;
+  ShieldStreamResult["stream"] extends ReadableStream<infer TPart>
+    ? TPart
+    : never;
 /** `SharedV4ProviderMetadata` value slot (`JSONObject`). */
-type ShieldMetadataValue = NonNullable<ShieldGenerateResult["providerMetadata"]>[string];
+type ShieldMetadataValue = NonNullable<
+  ShieldGenerateResult["providerMetadata"]
+>[string];
 
 export interface AiSdkMiddlewareConfig {
   /** AI Shield config (or pass an existing AIShield instance) */
@@ -234,32 +240,37 @@ export function aiShieldMiddleware(
       const context = buildContext(params);
       let fullText = "";
 
-      const transform = new TransformStream<ShieldStreamPart, ShieldStreamPart>({
-        transform: async (part, controller) => {
-          if (part.type === "text-delta") {
-            fullText += part.delta;
+      const transform = new TransformStream<ShieldStreamPart, ShieldStreamPart>(
+        {
+          transform: async (part, controller) => {
+            if (part.type === "text-delta") {
+              fullText += part.delta;
+              controller.enqueue(part);
+              return;
+            }
+
+            if (part.type === "finish") {
+              // Post-stream output scan (the text has already been
+              // emitted — findings are reported, not blocked, exactly
+              // like the other ai-shield streaming wrappers).
+              const scans = await runOutputScans(fullText, context);
+              controller.enqueue({
+                ...part,
+                providerMetadata: {
+                  ...part.providerMetadata,
+                  aiShield: buildShieldMetadata({
+                    input: inputResult,
+                    ...scans,
+                  }),
+                },
+              });
+              return;
+            }
+
             controller.enqueue(part);
-            return;
-          }
-
-          if (part.type === "finish") {
-            // Post-stream output scan (the text has already been
-            // emitted — findings are reported, not blocked, exactly
-            // like the other ai-shield streaming wrappers).
-            const scans = await runOutputScans(fullText, context);
-            controller.enqueue({
-              ...part,
-              providerMetadata: {
-                ...part.providerMetadata,
-                aiShield: buildShieldMetadata({ input: inputResult, ...scans }),
-              },
-            });
-            return;
-          }
-
-          controller.enqueue(part);
+          },
         },
-      });
+      );
 
       return { ...rest, stream: stream.pipeThrough(transform) };
     },
@@ -287,7 +298,10 @@ function extractUserText(prompt: ShieldPrompt): string {
 }
 
 /** Replace user message text with the sanitized version */
-function replaceUserText(prompt: ShieldPrompt, sanitized: string): ShieldPrompt {
+function replaceUserText(
+  prompt: ShieldPrompt,
+  sanitized: string,
+): ShieldPrompt {
   let remaining = sanitized;
 
   return prompt.map((msg) => {

@@ -6,7 +6,9 @@ describe("PIIScanner", () => {
 
   describe("detects German IBAN", () => {
     it("detects valid DE IBAN", () => {
-      const entities = scanner.detect("Meine IBAN ist DE89 3704 0044 0532 0130 00");
+      const entities = scanner.detect(
+        "Meine IBAN ist DE89 3704 0044 0532 0130 00",
+      );
       expect(entities).toHaveLength(1);
       expect(entities[0]!.type).toBe("iban");
       expect(entities[0]!.confidence).toBeGreaterThanOrEqual(0.9);
@@ -98,7 +100,9 @@ describe("PIIScanner", () => {
 
   describe("detects URLs with credentials", () => {
     it("detects embedded auth", () => {
-      const entities = scanner.detect("DB: https://admin:secret@db.example.com/mydb");
+      const entities = scanner.detect(
+        "DB: https://admin:secret@db.example.com/mydb",
+      );
       expect(entities).toHaveLength(1);
       expect(entities[0]!.type).toBe("url_with_credentials");
     });
@@ -124,7 +128,10 @@ describe("PIIScanner", () => {
 
   describe("allowed types", () => {
     it("skips allowed types", async () => {
-      const permissive = new PIIScanner({ action: "mask", allowedTypes: ["email"] });
+      const permissive = new PIIScanner({
+        action: "mask",
+        allowedTypes: ["email"],
+      });
       const result = await permissive.scan("Email: test@example.com", {});
       expect(result.decision).toBe("allow");
     });

@@ -229,7 +229,10 @@ export function assemblePrompt(
   // H2 + Analyst A4 round 1 review).
   const segmentIndexMap = new Map<ContextSegment, number>();
   ctx.segments.forEach((s, i) => segmentIndexMap.set(s, i));
-  const segmentResultMap = new Map<number, NonNullable<WrappedContext["scanResults"]>[number]>();
+  const segmentResultMap = new Map<
+    number,
+    NonNullable<WrappedContext["scanResults"]>[number]
+  >();
   for (const r of ctx.scanResults ?? []) {
     segmentResultMap.set(r.segmentIndex, r);
   }

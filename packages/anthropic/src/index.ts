@@ -13,11 +13,7 @@ export {
   type AnthropicStreamEvent,
 } from "./wrapper.js";
 
-export type {
-  ShieldConfig,
-  ScanResult,
-  ScanContext,
-} from "ai-shield-core";
+export type { ShieldConfig, ScanResult, ScanContext } from "ai-shield-core";
 
 // --- Convenience factory ---
 

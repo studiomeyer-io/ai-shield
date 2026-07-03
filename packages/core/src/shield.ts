@@ -1,4 +1,9 @@
-import type { ShieldConfig, ScanResult, ScanContext, ToolPolicy } from "./types.js";
+import type {
+  ShieldConfig,
+  ScanResult,
+  ScanContext,
+  ToolPolicy,
+} from "./types.js";
 import { ScannerChain } from "./scanner/chain.js";
 import { HeuristicScanner } from "./scanner/heuristic.js";
 import { PIIScanner } from "./scanner/pii.js";
@@ -31,20 +36,22 @@ export class AIShield {
     this.setupScanners(config);
 
     // Cost tracker (optional, needs Redis for distributed use)
-    this.costTracker = config.cost?.enabled !== false && config.cost?.budgets
-      ? new CostTracker(config.cost.budgets)
-      : null;
+    this.costTracker =
+      config.cost?.enabled !== false && config.cost?.budgets
+        ? new CostTracker(config.cost.budgets)
+        : null;
 
     // Audit logger (optional)
     this.auditLogger = this.setupAudit(config);
 
     // Scan cache (enabled when cache config is provided)
-    this.scanCache = config.cache && config.cache.enabled !== false
-      ? new ScanLRUCache<ScanResult>({
-          maxSize: config.cache.maxSize,
-          ttlMs: config.cache.ttlMs,
-        })
-      : null;
+    this.scanCache =
+      config.cache && config.cache.enabled !== false
+        ? new ScanLRUCache<ScanResult>({
+            maxSize: config.cache.maxSize,
+            ttlMs: config.cache.ttlMs,
+          })
+        : null;
   }
 
   /** Scan input text — the main API */
@@ -54,7 +61,9 @@ export class AIShield {
     // but pathological under ReDoS-prone patterns. 256 KB handles every
     // real chat/tool input we care about with plenty of headroom; override
     // via AI_SHIELD_MAX_INPUT_BYTES when needed.
-    const maxInputBytes = Number(process.env.AI_SHIELD_MAX_INPUT_BYTES ?? 262_144);
+    const maxInputBytes = Number(
+      process.env.AI_SHIELD_MAX_INPUT_BYTES ?? 262_144,
+    );
     if (input.length > maxInputBytes) {
       input = input.slice(0, maxInputBytes);
     }
@@ -118,7 +127,12 @@ export class AIShield {
     outputTokens: number,
   ) {
     if (!this.costTracker) return null;
-    return this.costTracker.recordCost(entityId, model, inputTokens, outputTokens);
+    return this.costTracker.recordCost(
+      entityId,
+      model,
+      inputTokens,
+      outputTokens,
+    );
   }
 
   /** Get current spend for an entity */
@@ -156,7 +170,12 @@ export class AIShield {
     // Include preset + tool names in key since they affect scan results
     const parts = [context.preset ?? "default"];
     if (context.tools?.length) {
-      parts.push(context.tools.map((t) => t.name).sort().join(","));
+      parts.push(
+        context.tools
+          .map((t) => t.name)
+          .sort()
+          .join(","),
+      );
     }
     parts.push(input);
     return parts.join("\x00");
@@ -170,13 +189,15 @@ export class AIShield {
         new HeuristicScanner({
           strictness: config.injection?.strictness ?? "medium",
           threshold: config.injection?.threshold ?? preset.injection.threshold,
-          customPatterns: config.injection?.customPatterns?.map((pattern, i) => ({
-            id: `CUSTOM-${i + 1}`,
-            category: "instruction_override" as const,
-            pattern,
-            weight: 0.25,
-            description: `Custom pattern #${i + 1}`,
-          })),
+          customPatterns: config.injection?.customPatterns?.map(
+            (pattern, i) => ({
+              id: `CUSTOM-${i + 1}`,
+              category: "instruction_override" as const,
+              pattern,
+              weight: 0.25,
+              description: `Custom pattern #${i + 1}`,
+            }),
+          ),
         }),
       );
     }

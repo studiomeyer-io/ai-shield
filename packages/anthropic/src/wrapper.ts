@@ -57,7 +57,10 @@ interface ContentBlockToolUse {
   input: Record<string, unknown>;
 }
 
-type ContentBlock = ContentBlockText | ContentBlockToolUse | { type: string; [key: string]: unknown };
+type ContentBlock =
+  | ContentBlockText
+  | ContentBlockToolUse
+  | { type: string; [key: string]: unknown };
 
 export interface AnthropicMessage {
   role: "user" | "assistant";
@@ -103,7 +106,9 @@ export interface AnthropicStreamEvent {
 
 interface AnthropicLike {
   messages: {
-    create(params: AnthropicCreateParams): Promise<AnthropicResponse | AsyncIterable<AnthropicStreamEvent>>;
+    create(
+      params: AnthropicCreateParams,
+    ): Promise<AnthropicResponse | AsyncIterable<AnthropicStreamEvent>>;
   };
 }
 
@@ -222,12 +227,16 @@ export class ShieldedAnthropic {
 
     // --- Also scan system prompt if present ---
     if (params.system) {
-      const systemText = typeof params.system === "string"
-        ? params.system
-        : params.system.map((b) => b.text).join("\n");
+      const systemText =
+        typeof params.system === "string"
+          ? params.system
+          : params.system.map((b) => b.text).join("\n");
 
       // System prompt scan is informational only
-      await shieldInstance.scan(systemText, { ...context, preset: "ops_agent" });
+      await shieldInstance.scan(systemText, {
+        ...context,
+        preset: "ops_agent",
+      });
     }
 
     // --- Replace sanitized content if PII was masked ---
@@ -255,9 +264,7 @@ export class ShieldedAnthropic {
   }
 
   /** Create message with Shield protection (non-streaming) */
-  async createMessage(
-    params: AnthropicCreateParams,
-  ): Promise<
+  async createMessage(params: AnthropicCreateParams): Promise<
     AnthropicResponse & {
       _shield?: {
         input: ScanResult;
@@ -266,10 +273,14 @@ export class ShieldedAnthropic {
       };
     }
   > {
-    const { shieldInstance, context, inputResult, finalParams } = await this.scanInput(params);
+    const { shieldInstance, context, inputResult, finalParams } =
+      await this.scanInput(params);
 
     // --- Make the actual API call ---
-    const response = await this.client.messages.create({ ...finalParams, stream: false }) as AnthropicResponse;
+    const response = (await this.client.messages.create({
+      ...finalParams,
+      stream: false,
+    })) as AnthropicResponse;
 
     // --- Record actual cost ---
     if (this.config.agentId && response.usage) {
@@ -303,10 +314,10 @@ export class ShieldedAnthropic {
       await this.scanInput(params as AnthropicCreateParams);
 
     // --- Make streaming API call ---
-    const stream = await this.client.messages.create({
+    const stream = (await this.client.messages.create({
       ...finalParams,
       stream: true,
-    }) as AsyncIterable<AnthropicStreamEvent>;
+    })) as AsyncIterable<AnthropicStreamEvent>;
 
     return new ShieldedAnthropicStream(
       stream,
@@ -410,7 +421,11 @@ export class ShieldedAnthropicStream implements AsyncIterable<AnthropicStreamEve
   async *[Symbol.asyncIterator](): AsyncGenerator<AnthropicStreamEvent> {
     for await (const event of this._stream) {
       // Accumulate text from content_block_delta events
-      if (event.type === "content_block_delta" && event.delta?.type === "text_delta" && event.delta.text) {
+      if (
+        event.type === "content_block_delta" &&
+        event.delta?.type === "text_delta" &&
+        event.delta.text
+      ) {
         this._fullText += event.delta.text;
       }
 
@@ -511,7 +526,11 @@ export class ShieldBlockError extends Error {
 export class ShieldBudgetError extends Error {
   constructor(
     message: string,
-    public readonly budgetCheck: { allowed: boolean; currentSpend: number; remainingBudget: number },
+    public readonly budgetCheck: {
+      allowed: boolean;
+      currentSpend: number;
+      remainingBudget: number;
+    },
   ) {
     super(message);
     this.name = "ShieldBudgetError";

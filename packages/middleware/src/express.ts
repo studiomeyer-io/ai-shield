@@ -22,7 +22,11 @@ interface ExpressResponse {
 }
 
 type NextFunction = (err?: unknown) => void;
-type ExpressMiddleware = (req: ExpressRequest, res: ExpressResponse, next: NextFunction) => void;
+type ExpressMiddleware = (
+  req: ExpressRequest,
+  res: ExpressResponse,
+  next: NextFunction,
+) => void;
 
 /**
  * Express middleware that scans request body for prompt injection and PII.
@@ -48,10 +52,16 @@ type ExpressMiddleware = (req: ExpressRequest, res: ExpressResponse, next: NextF
  * });
  * ```
  */
-export function shieldMiddleware(config: ShieldMiddlewareConfig = {}): ExpressMiddleware {
+export function shieldMiddleware(
+  config: ShieldMiddlewareConfig = {},
+): ExpressMiddleware {
   return (req: ExpressRequest, res: ExpressResponse, next: NextFunction) => {
     // Skip non-mutating methods
-    if (req.method === "GET" || req.method === "HEAD" || req.method === "OPTIONS") {
+    if (
+      req.method === "GET" ||
+      req.method === "HEAD" ||
+      req.method === "OPTIONS"
+    ) {
       return next();
     }
 

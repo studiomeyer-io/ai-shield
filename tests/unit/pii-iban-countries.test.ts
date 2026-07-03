@@ -14,11 +14,11 @@ describe("PIIScanner IBAN multi-country coverage", () => {
   // All check digits below are real, mod-97-valid sample IBANs from
   // the IBAN Registry spec — see https://www.iban.com/structure
   const cases: Array<[string, string]> = [
-    ["NO", "NO9386011117947"],           // 15 chars
-    ["BE", "BE68539007547034"],          // 16 chars
-    ["DK", "DK5000400440116243"],        // 18 chars
-    ["NL", "NL91ABNA0417164300"],        // 18 chars
-    ["DE", "DE89370400440532013000"],    // 22 chars (unchanged from v0.1.0)
+    ["NO", "NO9386011117947"], // 15 chars
+    ["BE", "BE68539007547034"], // 16 chars
+    ["DK", "DK5000400440116243"], // 18 chars
+    ["NL", "NL91ABNA0417164300"], // 18 chars
+    ["DE", "DE89370400440532013000"], // 22 chars (unchanged from v0.1.0)
     ["FR", "FR1420041010050500013M02606"], // 27 chars
     ["MT", "MT84MALT011000012345MTLCAST001S"], // 31 chars
   ];
@@ -27,7 +27,10 @@ describe("PIIScanner IBAN multi-country coverage", () => {
     it(`detects ${country} IBAN (${iban.length} chars): ${iban}`, () => {
       const entities = scanner.detect(iban);
       const ibans = entities.filter((e) => e.type === "iban");
-      expect(ibans.length, `IBAN for ${country} not detected`).toBeGreaterThanOrEqual(1);
+      expect(
+        ibans.length,
+        `IBAN for ${country} not detected`,
+      ).toBeGreaterThanOrEqual(1);
       expect(ibans[0]!.confidence).toBeGreaterThanOrEqual(0.9);
     });
   }

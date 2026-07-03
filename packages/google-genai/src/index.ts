@@ -22,11 +22,7 @@ export {
 } from "./wrapper.js";
 
 // Re-export core types for convenience
-export type {
-  ShieldConfig,
-  ScanResult,
-  ScanContext,
-} from "ai-shield-core";
+export type { ShieldConfig, ScanResult, ScanContext } from "ai-shield-core";
 
 // --- Convenience factory ---
 

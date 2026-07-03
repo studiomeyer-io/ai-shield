@@ -22,7 +22,10 @@ interface HonoContext {
 }
 
 type HonoNext = () => Promise<void>;
-type HonoMiddleware = (c: HonoContext, next: HonoNext) => Promise<Response | void>;
+type HonoMiddleware = (
+  c: HonoContext,
+  next: HonoNext,
+) => Promise<Response | void>;
 
 /**
  * Hono middleware that scans request body for prompt injection and PII.
@@ -45,10 +48,16 @@ type HonoMiddleware = (c: HonoContext, next: HonoNext) => Promise<Response | voi
  * });
  * ```
  */
-export function shieldMiddleware(config: ShieldMiddlewareConfig = {}): HonoMiddleware {
+export function shieldMiddleware(
+  config: ShieldMiddlewareConfig = {},
+): HonoMiddleware {
   return async (c: HonoContext, next: HonoNext): Promise<Response | void> => {
     // Skip non-mutating methods
-    if (c.req.method === "GET" || c.req.method === "HEAD" || c.req.method === "OPTIONS") {
+    if (
+      c.req.method === "GET" ||
+      c.req.method === "HEAD" ||
+      c.req.method === "OPTIONS"
+    ) {
       return next();
     }
 
@@ -81,10 +90,18 @@ export function shieldMiddleware(config: ShieldMiddlewareConfig = {}): HonoMiddl
 
     const context = config.getContext?.({ headers, body }) ?? {};
     if (config.getAgentId) {
-      context.agentId = config.getAgentId({ headers, path: c.req.path, url: c.req.url });
+      context.agentId = config.getAgentId({
+        headers,
+        path: c.req.path,
+        url: c.req.url,
+      });
     }
 
-    const { blocked, result, response } = await scanRequest(config, input, context);
+    const { blocked, result, response } = await scanRequest(
+      config,
+      input,
+      context,
+    );
 
     if (blocked && response) {
       return c.json(response.body, response.status);

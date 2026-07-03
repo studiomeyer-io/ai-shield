@@ -47,7 +47,10 @@ describe("review — additional secret types (GCP / HuggingFace / npm / Google O
   for (const [secret, name] of cases) {
     it(`flags ${name}`, async () => {
       const r = await scanOutput(secret, { pii: false });
-      expect(r.violations.some((v) => v.type === "secret_leak"), name).toBe(true);
+      expect(
+        r.violations.some((v) => v.type === "secret_leak"),
+        name,
+      ).toBe(true);
     });
   }
 
@@ -58,7 +61,8 @@ describe("review — additional secret types (GCP / HuggingFace / npm / Google O
     );
     expect(
       r.violations.some(
-        (v) => v.type === "output_injection" && v.detail?.includes("OUTI-MDEXF"),
+        (v) =>
+          v.type === "output_injection" && v.detail?.includes("OUTI-MDEXF"),
       ),
     ).toBe(true);
   });
@@ -100,7 +104,9 @@ describe("review C2 — judge fails to error (not benign) on unparseable output"
   });
 
   it("still parses a verdict-only response (no confidence) as a soft verdict", async () => {
-    const judge = createAsyncJudge({ backend: async () => "VERDICT: malicious" });
+    const judge = createAsyncJudge({
+      backend: async () => "VERDICT: malicious",
+    });
     const v = await judge.evaluate("x");
     expect(v.verdict).toBe("malicious");
   });

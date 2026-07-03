@@ -1,6 +1,10 @@
 import { describe, it, expect } from "vitest";
 import { CostTracker } from "../../packages/core/src/cost/tracker.js";
-import { getModelPricing, estimateCost, MODEL_PRICING } from "../../packages/core/src/cost/pricing.js";
+import {
+  getModelPricing,
+  estimateCost,
+  MODEL_PRICING,
+} from "../../packages/core/src/cost/pricing.js";
 import { detectAnomaly } from "../../packages/core/src/cost/anomaly.js";
 
 describe("CostTracker", () => {
@@ -16,7 +20,12 @@ describe("CostTracker", () => {
       const tracker = new CostTracker({
         agent: { softLimit: 5, hardLimit: 10, period: "daily" },
       });
-      const result = await tracker.checkBudget("agent", "gpt-4o-mini", 1000, 500);
+      const result = await tracker.checkBudget(
+        "agent",
+        "gpt-4o-mini",
+        1000,
+        500,
+      );
       expect(result.allowed).toBe(true);
       expect(result.remainingBudget).toBeGreaterThan(0);
     });
@@ -29,7 +38,12 @@ describe("CostTracker", () => {
       // Record a cost first
       await tracker.recordCost("agent", "claude-opus-4-6", 10000, 5000);
 
-      const result = await tracker.checkBudget("agent", "claude-opus-4-6", 10000, 5000);
+      const result = await tracker.checkBudget(
+        "agent",
+        "claude-opus-4-6",
+        10000,
+        5000,
+      );
       expect(result.allowed).toBe(false);
       expect(result.warning).toBeDefined();
     });

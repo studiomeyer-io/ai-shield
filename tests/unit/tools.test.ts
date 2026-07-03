@@ -1,6 +1,9 @@
 import { describe, it, expect } from "vitest";
 import { ToolPolicyScanner } from "../../packages/core/src/policy/tools.js";
-import type { ToolPolicy, ToolManifestPin } from "../../packages/core/src/types.js";
+import type {
+  ToolPolicy,
+  ToolManifestPin,
+} from "../../packages/core/src/types.js";
 
 describe("ToolPolicyScanner", () => {
   const policy: ToolPolicy = {
@@ -67,22 +70,31 @@ describe("ToolPolicyScanner", () => {
   describe("manifest pinning", () => {
     it("creates manifest pin", () => {
       const pin = ToolPolicyScanner.pinManifest("mcp-crm", [
-        "create_lead", "get_leads", "search_leads", "delete_lead",
+        "create_lead",
+        "get_leads",
+        "search_leads",
+        "delete_lead",
       ]);
       expect(pin.serverId).toBe("mcp-crm");
       expect(pin.toolCount).toBe(4);
       expect(pin.toolsHash).toHaveLength(64); // SHA-256 hex
       expect(pin.knownTools).toEqual([
-        "create_lead", "delete_lead", "get_leads", "search_leads",
+        "create_lead",
+        "delete_lead",
+        "get_leads",
+        "search_leads",
       ]); // sorted
     });
 
     it("detects manifest drift — added tools", () => {
       const pin = ToolPolicyScanner.pinManifest("mcp-crm", [
-        "create_lead", "get_leads",
+        "create_lead",
+        "get_leads",
       ]);
       const result = ToolPolicyScanner.verifyManifest(pin, [
-        "create_lead", "get_leads", "evil_backdoor",
+        "create_lead",
+        "get_leads",
+        "evil_backdoor",
       ]);
       expect(result.valid).toBe(false);
       expect(result.added).toContain("evil_backdoor");
@@ -90,10 +102,13 @@ describe("ToolPolicyScanner", () => {
 
     it("detects manifest drift — removed tools", () => {
       const pin = ToolPolicyScanner.pinManifest("mcp-crm", [
-        "create_lead", "get_leads", "delete_lead",
+        "create_lead",
+        "get_leads",
+        "delete_lead",
       ]);
       const result = ToolPolicyScanner.verifyManifest(pin, [
-        "create_lead", "get_leads",
+        "create_lead",
+        "get_leads",
       ]);
       expect(result.valid).toBe(false);
       expect(result.removed).toContain("delete_lead");
@@ -108,7 +123,8 @@ describe("ToolPolicyScanner", () => {
 
     it("detects unknown tools via scanner", async () => {
       const pin: ToolManifestPin = ToolPolicyScanner.pinManifest("mcp-crm", [
-        "create_lead", "get_leads",
+        "create_lead",
+        "get_leads",
       ]);
       const pinScanner = new ToolPolicyScanner(policy, [pin]);
 
@@ -116,7 +132,9 @@ describe("ToolPolicyScanner", () => {
         agentId: "support-agent",
         tools: [{ name: "evil_tool", serverId: "mcp-crm" }],
       });
-      expect(result.violations.some((v) => v.type === "manifest_drift")).toBe(true);
+      expect(result.violations.some((v) => v.type === "manifest_drift")).toBe(
+        true,
+      );
     });
   });
 

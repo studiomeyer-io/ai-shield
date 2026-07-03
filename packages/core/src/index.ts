@@ -98,10 +98,18 @@ export {
 // Cost
 export { CostTracker, type RedisLike } from "./cost/tracker.js";
 export { detectAnomaly, type AnomalyResult } from "./cost/anomaly.js";
-export { getModelPricing, estimateCost, MODEL_PRICING } from "./cost/pricing.js";
+export {
+  getModelPricing,
+  estimateCost,
+  MODEL_PRICING,
+} from "./cost/pricing.js";
 
 // Audit
-export { AuditLogger, ConsoleAuditStore, MemoryAuditStore } from "./audit/logger.js";
+export {
+  AuditLogger,
+  ConsoleAuditStore,
+  MemoryAuditStore,
+} from "./audit/logger.js";
 export {
   PostgresAuditStore,
   type PostgresAuditStoreConfig,

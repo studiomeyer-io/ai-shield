@@ -1,4 +1,9 @@
-import type { AIShield, ShieldConfig, ScanContext, ScanResult } from "ai-shield-core";
+import type {
+  AIShield,
+  ShieldConfig,
+  ScanContext,
+  ScanResult,
+} from "ai-shield-core";
 
 // ============================================================
 // Shared middleware logic — used by Express and Hono adapters
@@ -10,9 +15,16 @@ export interface ShieldMiddlewareConfig {
   /** Pre-created AIShield instance (shared across routes) */
   shieldInstance?: AIShield;
   /** Extract agent ID from request */
-  getAgentId?: (req: { headers: Record<string, string | string[] | undefined>; path?: string; url?: string }) => string | undefined;
+  getAgentId?: (req: {
+    headers: Record<string, string | string[] | undefined>;
+    path?: string;
+    url?: string;
+  }) => string | undefined;
   /** Extract scan context from request */
-  getContext?: (req: { headers: Record<string, string | string[] | undefined>; body?: unknown }) => ScanContext;
+  getContext?: (req: {
+    headers: Record<string, string | string[] | undefined>;
+    body?: unknown;
+  }) => ScanContext;
   /** Extract text to scan from request body */
   getInput?: (body: unknown) => string | null;
   /** Custom blocked response */
@@ -39,7 +51,9 @@ export function defaultGetInput(body: unknown): string | null {
 
   // OpenAI-style messages array
   if (Array.isArray(obj.messages)) {
-    const userMessages = (obj.messages as Array<{ role?: string; content?: string }>)
+    const userMessages = (
+      obj.messages as Array<{ role?: string; content?: string }>
+    )
       .filter((m) => m.role === "user" && typeof m.content === "string")
       .map((m) => m.content as string);
     if (userMessages.length > 0) return userMessages.join("\n");
@@ -49,7 +63,10 @@ export function defaultGetInput(body: unknown): string | null {
 }
 
 /** Default blocked response */
-export function defaultBlockedResponse(result: ScanResult): { status: number; body: unknown } {
+export function defaultBlockedResponse(result: ScanResult): {
+  status: number;
+  body: unknown;
+} {
   return {
     status: 403,
     body: {
@@ -67,7 +84,9 @@ export function defaultBlockedResponse(result: ScanResult): { status: number; bo
 let _sharedShield: AIShield | null = null;
 let _shieldReady: Promise<AIShield> | null = null;
 
-export async function getOrCreateShield(config: ShieldMiddlewareConfig): Promise<AIShield> {
+export async function getOrCreateShield(
+  config: ShieldMiddlewareConfig,
+): Promise<AIShield> {
   if (config.shieldInstance) return config.shieldInstance;
   if (_sharedShield) return _sharedShield;
   if (_shieldReady) return _shieldReady;
@@ -85,7 +104,11 @@ export async function scanRequest(
   config: ShieldMiddlewareConfig,
   input: string,
   context: ScanContext,
-): Promise<{ blocked: boolean; result: ScanResult; response?: { status: number; body: unknown } }> {
+): Promise<{
+  blocked: boolean;
+  result: ScanResult;
+  response?: { status: number; body: unknown };
+}> {
   const shield = await getOrCreateShield(config);
   const result = await shield.scan(input, context);
 

@@ -69,10 +69,7 @@ describe("wrapContext() segment building", () => {
 
   it("accepts retrieved items as plain strings or {content,label} objects", () => {
     const ctx = wrapContext({
-      retrieved: [
-        "plain chunk",
-        { content: "labeled chunk", label: "wiki/X" },
-      ],
+      retrieved: ["plain chunk", { content: "labeled chunk", label: "wiki/X" }],
     });
     expect(ctx.segments).toHaveLength(2);
     expect(ctx.segments[0]!.content).toBe("plain chunk");
@@ -91,9 +88,7 @@ describe("wrapContext() segment building", () => {
       agentOutput: ["downstream agent message"],
     });
     expect(ctx.segments).toHaveLength(4);
-    const bySource = Object.fromEntries(
-      ctx.segments.map((s) => [s.source, s]),
-    );
+    const bySource = Object.fromEntries(ctx.segments.map((s) => [s.source, s]));
     expect(bySource["tool-desc"]!.content).toBe("tool description");
     expect(bySource["memory"]!.content).toBe("memory fact");
     expect(bySource["web"]!.content).toBe("scraped page text");
@@ -112,7 +107,9 @@ describe("wrapContext() segment building", () => {
       trustedLabels: ["internal-kb"],
     });
     expect(ctx.segments).toHaveLength(2);
-    const internal = ctx.segments.find((s) => s.label?.includes("Internal-KB"))!;
+    const internal = ctx.segments.find((s) =>
+      s.label?.includes("Internal-KB"),
+    )!;
     const wiki = ctx.segments.find((s) => s.label?.includes("wikipedia"))!;
     expect(internal.trust).toBe("trusted");
     expect(wiki.trust).toBe("untrusted");

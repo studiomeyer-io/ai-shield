@@ -74,7 +74,9 @@ export class CostTracker {
     this.store = redis ?? new MemoryStore();
     this.budgets = new Map(Object.entries(budgets));
     const envCap = Number(process.env.AI_SHIELD_MAX_RECORDS);
-    this.maxRecords = options.maxRecords ?? (Number.isFinite(envCap) && envCap >= 0 ? envCap : 10_000);
+    this.maxRecords =
+      options.maxRecords ??
+      (Number.isFinite(envCap) && envCap >= 0 ? envCap : 10_000);
   }
 
   /** Check if a request is within budget BEFORE sending to LLM */
@@ -89,7 +91,11 @@ export class CostTracker {
       return { allowed: true, currentSpend: 0, remainingBudget: Infinity };
     }
 
-    const estimated = estimateCost(model, estimatedInputTokens, estimatedOutputTokens);
+    const estimated = estimateCost(
+      model,
+      estimatedInputTokens,
+      estimatedOutputTokens,
+    );
     const key = this.budgetKey(entityId, budget.period);
     const currentSpend = parseFloat((await this.store.get(key)) ?? "0");
 
@@ -145,7 +151,10 @@ export class CostTracker {
     if (globalBudget && entityId !== "global") {
       const globalKey = this.budgetKey("global", globalBudget.period);
       await this.store.incrbyfloat(globalKey, cost);
-      await this.store.expire(globalKey, this.periodSeconds(globalBudget.period) * 2);
+      await this.store.expire(
+        globalKey,
+        this.periodSeconds(globalBudget.period) * 2,
+      );
     }
 
     this.appendRecord(record);

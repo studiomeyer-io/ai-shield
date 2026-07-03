@@ -1,5 +1,8 @@
 import { describe, it, expect } from "vitest";
-import { defaultGetInput, defaultBlockedResponse } from "../../packages/middleware/src/shared.js";
+import {
+  defaultGetInput,
+  defaultBlockedResponse,
+} from "../../packages/middleware/src/shared.js";
 import type { ScanResult } from "../../packages/core/src/types.js";
 
 describe("Middleware Shared", () => {
@@ -91,7 +94,11 @@ describe("Middleware Shared", () => {
       const response = defaultBlockedResponse(scanResult);
       expect(response.status).toBe(403);
 
-      const body = response.body as { error: string; decision: string; violations: Array<{ type: string; message: string }> };
+      const body = response.body as {
+        error: string;
+        decision: string;
+        violations: Array<{ type: string; message: string }>;
+      };
       expect(body.error).toBe("Request blocked by AI Shield");
       expect(body.decision).toBe("block");
       expect(body.violations).toHaveLength(1);
@@ -105,10 +112,26 @@ describe("Middleware Shared", () => {
         decision: "block",
         sanitized: "",
         violations: [
-          { type: "prompt_injection", scanner: "heuristic", score: 0.8, threshold: 0.3, message: "Injection" },
-          { type: "pii_detected", scanner: "pii", score: 0.95, threshold: 0, message: "PII found" },
+          {
+            type: "prompt_injection",
+            scanner: "heuristic",
+            score: 0.8,
+            threshold: 0.3,
+            message: "Injection",
+          },
+          {
+            type: "pii_detected",
+            scanner: "pii",
+            score: 0.95,
+            threshold: 0,
+            message: "PII found",
+          },
         ],
-        meta: { scanDurationMs: 2, scannersRun: ["heuristic", "pii"], cached: false },
+        meta: {
+          scanDurationMs: 2,
+          scannersRun: ["heuristic", "pii"],
+          cached: false,
+        },
       };
 
       const response = defaultBlockedResponse(scanResult);

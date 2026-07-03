@@ -14,31 +14,59 @@ import type { ModelPricing } from "../types.js";
 
 export const MODEL_PRICING: Record<string, ModelPricing> = {
   // OpenAI
-  "gpt-5.2": { inputPer1M: 2.50, outputPer1M: 10.0 },
-  "gpt-5.1": { inputPer1M: 2.50, outputPer1M: 10.0 },
-  "gpt-5": { inputPer1M: 2.50, outputPer1M: 10.0 },
-  "gpt-4.1": { inputPer1M: 2.00, outputPer1M: 8.00 },
-  "gpt-4o": { inputPer1M: 2.50, outputPer1M: 10.0 },
-  "gpt-4o-mini": { inputPer1M: 0.15, outputPer1M: 0.60 },
+  "gpt-5.2": { inputPer1M: 2.5, outputPer1M: 10.0 },
+  "gpt-5.1": { inputPer1M: 2.5, outputPer1M: 10.0 },
+  "gpt-5": { inputPer1M: 2.5, outputPer1M: 10.0 },
+  "gpt-4.1": { inputPer1M: 2.0, outputPer1M: 8.0 },
+  "gpt-4o": { inputPer1M: 2.5, outputPer1M: 10.0 },
+  "gpt-4o-mini": { inputPer1M: 0.15, outputPer1M: 0.6 },
   "o3": { inputPer1M: 10.0, outputPer1M: 40.0 },
-  "o3-mini": { inputPer1M: 1.10, outputPer1M: 4.40 },
-  "o4-mini": { inputPer1M: 1.10, outputPer1M: 4.40 },
+  "o3-mini": { inputPer1M: 1.1, outputPer1M: 4.4 },
+  "o4-mini": { inputPer1M: 1.1, outputPer1M: 4.4 },
 
   // Anthropic — June 2026 line-up (Fable 5, Opus 4.8/4.7/4.6, Sonnet 4.6, Haiku 4.5)
-  "claude-fable-5": { inputPer1M: 10.0, outputPer1M: 50.0, cachedInputPer1M: 1.0 },
-  "claude-opus-4-8": { inputPer1M: 5.0, outputPer1M: 25.0, cachedInputPer1M: 0.50 },
-  "claude-opus-4-7": { inputPer1M: 5.0, outputPer1M: 25.0, cachedInputPer1M: 0.50 },
-  "claude-opus-4-6": { inputPer1M: 5.0, outputPer1M: 25.0, cachedInputPer1M: 0.50 },
-  "claude-sonnet-4-6": { inputPer1M: 3.0, outputPer1M: 15.0, cachedInputPer1M: 0.30 },
-  "claude-sonnet-4-5": { inputPer1M: 3.0, outputPer1M: 15.0, cachedInputPer1M: 0.30 },
-  "claude-haiku-4-5": { inputPer1M: 1.0, outputPer1M: 5.0, cachedInputPer1M: 0.10 },
+  "claude-fable-5": {
+    inputPer1M: 10.0,
+    outputPer1M: 50.0,
+    cachedInputPer1M: 1.0,
+  },
+  "claude-opus-4-8": {
+    inputPer1M: 5.0,
+    outputPer1M: 25.0,
+    cachedInputPer1M: 0.5,
+  },
+  "claude-opus-4-7": {
+    inputPer1M: 5.0,
+    outputPer1M: 25.0,
+    cachedInputPer1M: 0.5,
+  },
+  "claude-opus-4-6": {
+    inputPer1M: 5.0,
+    outputPer1M: 25.0,
+    cachedInputPer1M: 0.5,
+  },
+  "claude-sonnet-4-6": {
+    inputPer1M: 3.0,
+    outputPer1M: 15.0,
+    cachedInputPer1M: 0.3,
+  },
+  "claude-sonnet-4-5": {
+    inputPer1M: 3.0,
+    outputPer1M: 15.0,
+    cachedInputPer1M: 0.3,
+  },
+  "claude-haiku-4-5": {
+    inputPer1M: 1.0,
+    outputPer1M: 5.0,
+    cachedInputPer1M: 0.1,
+  },
 
   // Aliases
-  "gpt-5.2-turbo": { inputPer1M: 2.50, outputPer1M: 10.0 },
+  "gpt-5.2-turbo": { inputPer1M: 2.5, outputPer1M: 10.0 },
   fable: { inputPer1M: 10.0, outputPer1M: 50.0, cachedInputPer1M: 1.0 },
-  opus: { inputPer1M: 5.0, outputPer1M: 25.0, cachedInputPer1M: 0.50 },
-  sonnet: { inputPer1M: 3.0, outputPer1M: 15.0, cachedInputPer1M: 0.30 },
-  haiku: { inputPer1M: 1.0, outputPer1M: 5.0, cachedInputPer1M: 0.10 },
+  opus: { inputPer1M: 5.0, outputPer1M: 25.0, cachedInputPer1M: 0.5 },
+  sonnet: { inputPer1M: 3.0, outputPer1M: 15.0, cachedInputPer1M: 0.3 },
+  haiku: { inputPer1M: 1.0, outputPer1M: 5.0, cachedInputPer1M: 0.1 },
 };
 
 /** Get pricing for a model, fallback to gpt-4o-mini rates */
@@ -53,7 +81,7 @@ export function getModelPricing(model: string): ModelPricing {
   }
 
   // Fallback
-  return { inputPer1M: 0.15, outputPer1M: 0.60 };
+  return { inputPer1M: 0.15, outputPer1M: 0.6 };
 }
 
 /** Estimate cost for a given number of tokens */

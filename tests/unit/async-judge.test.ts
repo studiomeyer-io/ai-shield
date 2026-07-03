@@ -16,7 +16,8 @@ describe("createAsyncJudge — verdict parsing", () => {
 
   it("parses benign", async () => {
     const judge = createAsyncJudge({
-      backend: async () => "VERDICT: benign\nCONFIDENCE: 0.1\nREASON: normal question",
+      backend: async () =>
+        "VERDICT: benign\nCONFIDENCE: 0.1\nREASON: normal question",
     });
     const v = await judge.evaluate("what time is it?");
     expect(v.verdict).toBe("benign");

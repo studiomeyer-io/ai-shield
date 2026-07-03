@@ -89,7 +89,9 @@ export interface ChatCompletionChunk {
 interface OpenAILike {
   chat: {
     completions: {
-      create(params: ChatCompletionParams): Promise<ChatCompletion | AsyncIterable<ChatCompletionChunk>>;
+      create(
+        params: ChatCompletionParams,
+      ): Promise<ChatCompletion | AsyncIterable<ChatCompletionChunk>>;
     };
   };
 }
@@ -225,9 +227,7 @@ export class ShieldedOpenAI {
   }
 
   /** Create chat completion with Shield protection (non-streaming) */
-  async createChatCompletion(
-    params: ChatCompletionParams,
-  ): Promise<
+  async createChatCompletion(params: ChatCompletionParams): Promise<
     ChatCompletion & {
       _shield?: {
         input: ScanResult;
@@ -236,10 +236,14 @@ export class ShieldedOpenAI {
       };
     }
   > {
-    const { shieldInstance, context, inputResult, finalParams } = await this.scanInput(params);
+    const { shieldInstance, context, inputResult, finalParams } =
+      await this.scanInput(params);
 
     // --- Make the actual API call ---
-    const response = await this.client.chat.completions.create({ ...finalParams, stream: false }) as ChatCompletion;
+    const response = (await this.client.chat.completions.create({
+      ...finalParams,
+      stream: false,
+    })) as ChatCompletion;
 
     // --- Record cost ---
     if (this.config.agentId && response.usage) {
@@ -273,10 +277,10 @@ export class ShieldedOpenAI {
       await this.scanInput(params as ChatCompletionParams);
 
     // --- Make streaming API call ---
-    const stream = await this.client.chat.completions.create({
+    const stream = (await this.client.chat.completions.create({
       ...finalParams,
       stream: true,
-    }) as AsyncIterable<ChatCompletionChunk>;
+    })) as AsyncIterable<ChatCompletionChunk>;
 
     return new ShieldedChatStream(
       stream,
@@ -352,7 +356,8 @@ export class ShieldedChatStream implements AsyncIterable<ChatCompletionChunk> {
   private _outputScan: boolean | OutputScanConfig | undefined;
   private _agentId: string | undefined;
   private _model: string;
-  private _usage: { prompt_tokens: number; completion_tokens: number } | undefined;
+  private _usage:
+    { prompt_tokens: number; completion_tokens: number } | undefined;
 
   constructor(
     stream: AsyncIterable<ChatCompletionChunk>,
@@ -477,7 +482,11 @@ export class ShieldBlockError extends Error {
 export class ShieldBudgetError extends Error {
   constructor(
     message: string,
-    public readonly budgetCheck: { allowed: boolean; currentSpend: number; remainingBudget: number },
+    public readonly budgetCheck: {
+      allowed: boolean;
+      currentSpend: number;
+      remainingBudget: number;
+    },
   ) {
     super(message);
     this.name = "ShieldBudgetError";

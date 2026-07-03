@@ -516,7 +516,11 @@ export class ShieldBlockError extends Error {
 export class ShieldBudgetError extends Error {
   constructor(
     message: string,
-    public readonly budgetCheck: { allowed: boolean; currentSpend: number; remainingBudget: number },
+    public readonly budgetCheck: {
+      allowed: boolean;
+      currentSpend: number;
+      remainingBudget: number;
+    },
   ) {
     super(message);
     this.name = "ShieldBudgetError";

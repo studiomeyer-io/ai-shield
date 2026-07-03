@@ -6,7 +6,9 @@ import {
 
 describe("OutputScanner — secret leak", () => {
   it("blocks and redacts an OpenAI key", async () => {
-    const r = await scanOutput("here is the key sk-proj-abcdefghijklmnop1234567890");
+    const r = await scanOutput(
+      "here is the key sk-proj-abcdefghijklmnop1234567890",
+    );
     expect(r.safe).toBe(false);
     expect(r.decision).toBe("block");
     expect(r.violations.some((v) => v.type === "secret_leak")).toBe(true);
@@ -24,12 +26,17 @@ describe("OutputScanner — secret leak", () => {
     for (const c of cases) {
       const r = await scanOutput(c);
       expect(r.decision, c).toBe("block");
-      expect(r.violations.some((v) => v.type === "secret_leak"), c).toBe(true);
+      expect(
+        r.violations.some((v) => v.type === "secret_leak"),
+        c,
+      ).toBe(true);
     }
   });
 
   it("redacts every occurrence", async () => {
-    const r = await scanOutput("ghp_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa and ghp_bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb");
+    const r = await scanOutput(
+      "ghp_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa and ghp_bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+    );
     expect(r.sanitized.match(/\[REDACTED_SECRET\]/g)?.length).toBe(2);
   });
 
@@ -57,7 +64,9 @@ describe("OutputScanner — secret leak", () => {
   });
 
   it("clean (non-split) secret still redacts and preserves surrounding text", async () => {
-    const r = await scanOutput("token is sk-proj-abcdefghijklmnop1234567890 thanks");
+    const r = await scanOutput(
+      "token is sk-proj-abcdefghijklmnop1234567890 thanks",
+    );
     expect(r.sanitized).toContain("[REDACTED_SECRET]");
     expect(r.sanitized).not.toContain("sk-proj-abcdefghijklmnop");
     expect(r.sanitized).toContain("thanks");
@@ -87,9 +96,9 @@ describe("OutputScanner — output injection (LLM05)", () => {
   it("respects the sinks filter — only flags the configured sink", async () => {
     const sqlPayload = "x UNION SELECT secret FROM t";
     const onlyShell = await scanOutput(sqlPayload, { sinks: ["shell"] });
-    expect(onlyShell.violations.some((v) => v.type === "output_injection")).toBe(
-      false,
-    );
+    expect(
+      onlyShell.violations.some((v) => v.type === "output_injection"),
+    ).toBe(false);
     const withSql = await scanOutput(sqlPayload, { sinks: ["sql"] });
     expect(withSql.violations.some((v) => v.type === "output_injection")).toBe(
       true,
@@ -104,7 +113,9 @@ describe("OutputScanner — system prompt leak", () => {
       canaryTokens: token,
     });
     expect(r.decision).toBe("block");
-    expect(r.violations.some((v) => v.type === "system_prompt_leak")).toBe(true);
+    expect(r.violations.some((v) => v.type === "system_prompt_leak")).toBe(
+      true,
+    );
   });
 
   it("warns on heuristic phrasing when no canary is configured", async () => {

@@ -1,10 +1,15 @@
 import { describe, it, expect } from "vitest";
-import { injectCanary, checkCanaryLeak } from "../../packages/core/src/scanner/canary.js";
+import {
+  injectCanary,
+  checkCanaryLeak,
+} from "../../packages/core/src/scanner/canary.js";
 
 describe("Canary Tokens", () => {
   describe("injectCanary", () => {
     it("adds canary to system prompt", () => {
-      const { injectedPrompt, canaryToken } = injectCanary("You are a helpful assistant.");
+      const { injectedPrompt, canaryToken } = injectCanary(
+        "You are a helpful assistant.",
+      );
       expect(injectedPrompt).toContain("You are a helpful assistant.");
       expect(injectedPrompt).toContain(canaryToken);
       expect(injectedPrompt).toContain("CANARY:");
@@ -41,7 +46,9 @@ describe("Canary Tokens", () => {
     });
 
     it("detects partial prompt extraction", () => {
-      const { injectedPrompt, canaryToken } = injectCanary("Secret instructions here.");
+      const { injectedPrompt, canaryToken } = injectCanary(
+        "Secret instructions here.",
+      );
       // Simulate LLM outputting the full system prompt
       expect(checkCanaryLeak(injectedPrompt, canaryToken)).toBe(true);
     });

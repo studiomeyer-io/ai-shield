@@ -36,13 +36,17 @@ describe("PIIScanner Extended", () => {
 
   describe("URL with credentials", () => {
     it("detects user:pass@host in URL", () => {
-      const entities = scanner.detect("DB: https://admin:secret@db.example.com/mydb");
+      const entities = scanner.detect(
+        "DB: https://admin:secret@db.example.com/mydb",
+      );
       expect(entities).toHaveLength(1);
       expect(entities[0]!.type).toBe("url_with_credentials");
     });
 
     it("detects credentials in http URL", () => {
-      const entities = scanner.detect("http://user:password123@api.example.com/v1");
+      const entities = scanner.detect(
+        "http://user:password123@api.example.com/v1",
+      );
       expect(entities).toHaveLength(1);
       expect(entities[0]!.type).toBe("url_with_credentials");
     });
@@ -59,7 +63,10 @@ describe("PIIScanner Extended", () => {
 
     it("block action blocks on any PII", async () => {
       const blockScanner = new PIIScanner({ action: "block" });
-      const result = await blockScanner.scan("IBAN: DE89 3704 0044 0532 0130 00", {});
+      const result = await blockScanner.scan(
+        "IBAN: DE89 3704 0044 0532 0130 00",
+        {},
+      );
       expect(result.decision).toBe("block");
     });
   });
@@ -104,8 +111,10 @@ describe("PIIScanner Extended", () => {
 
   describe("very long input with many PII matches", () => {
     it("detects multiple PII in long text", async () => {
-      const longText = Array.from({ length: 10 }, (_, i) =>
-        `User ${i}: email${i}@test.com, phone +49 171 ${String(i).padStart(7, "0")}`,
+      const longText = Array.from(
+        { length: 10 },
+        (_, i) =>
+          `User ${i}: email${i}@test.com, phone +49 171 ${String(i).padStart(7, "0")}`,
       ).join(". ");
 
       const result = await scanner.scan(longText, {});
@@ -123,7 +132,10 @@ describe("PIIScanner Extended", () => {
     });
 
     it("handles text with no PII", async () => {
-      const result = await scanner.scan("This is a normal message without personal data", {});
+      const result = await scanner.scan(
+        "This is a normal message without personal data",
+        {},
+      );
       expect(result.decision).toBe("allow");
       expect(result.violations).toHaveLength(0);
     });
