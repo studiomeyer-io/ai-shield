@@ -1,0 +1,6 @@
+# Bulk formatting commits to skip in git blame.
+# GitHub honors this file automatically; locally, opt in once with:
+#   git config blame.ignoreRevsFile .git-blame-ignore-revs
+
+# style: apply prettier formatting baseline (2026-07-04)
+4171f79f2b0bb2a9011a12ead44fb99179f1d333
