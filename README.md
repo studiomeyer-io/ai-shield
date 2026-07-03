@@ -18,7 +18,7 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 [![TypeScript](https://img.shields.io/badge/TypeScript-strict-blue.svg)](tsconfig.json)
 [![Zero Dependencies](https://img.shields.io/badge/dependencies-0-brightgreen.svg)](package.json)
-[![Tests: 712 passing](https://img.shields.io/badge/tests-712%20passing-brightgreen.svg)](tests/)
+[![Tests: 716 passing](https://img.shields.io/badge/tests-716%20passing-brightgreen.svg)](tests/)
 
 Prompt injection detection (incl. unicode-tag / leetspeak / typoglycemia / letter-splitting / multilingual evasion) · Indirect-injection (RAG / tool-desc / tool-output / memory / web) · Output scanning (SQL / shell / XSS / secret leak) · PII protection · Trust-tier context streams · Multi-agent trust propagation · Dual-LLM privilege separation · Memory poisoning detection · Tool policy enforcement · Circuit breakers · Async LLM-judge · Cost tracking · Audit logging
 
@@ -1124,7 +1124,7 @@ ai-shield/
 │           ├── express.ts     Express middleware
 │           └── hono.ts        Hono middleware
 │
-├── tests/                     43 files · 712 cases (vitest)
+├── tests/                     44 files · 716 cases (vitest)
 │   ├── unit/                  scanners, policy, cost, wrappers, middleware
 │   ├── integration/           defense-in-depth + full-pipeline
 │   └── corpus/                labelled attack / benign harness (0% FP bar)
@@ -1139,7 +1139,7 @@ ai-shield/
 ## Tests
 
 ```bash
-npm test            # 712 tests across 43 files, ~1.3s
+npm test            # 716 tests across 44 files, ~1.3s
 ```
 
 Counts below are grouped by area and sum to the full suite; run `npm test` for
@@ -1154,7 +1154,7 @@ the authoritative number.
 | Circuit breakers (runtime tool guard) | 40 | Rate limit, blast-radius cap, trip + cooldown, HITL hook, LRU key eviction |
 | PII detection | 48 | IBAN (mod-97) / credit card (Luhn) / email / phone / tax ID / IP / URL, masking, overlap dedup, 40+ IBAN countries |
 | SDK wrappers (OpenAI / Anthropic / Gemini incl. streaming) | 57 | Clean/injection/PII paths, pre-stream blocking, cost recording, output scan, callbacks |
-| Shield core / chain / cache / singleton | 76 | Config + presets, escalation + early-exit, LRU cache, singleton reuse, v0.3 review-fix regressions |
+| Shield core / chain / cache / singleton | 80 | Config + presets, escalation + early-exit, LRU cache, singleton reuse, input-size guard, v0.3 review-fix regressions |
 | Cost tracking + anomaly | 31 | Budget checks, pricing table, z-score anomaly, records ring-buffer cap |
 | ML classifier (optional ONNX) | 31 | `Scanner` interface, hermetic mock runtime + tokenizer, graceful-degrade |
 | Output scanning (v0.3) | 21 | Secret leak / SQL-shell-XSS / system-prompt leak / jailbreak / output-side PII |
