@@ -30,7 +30,8 @@
     "packages/anthropic",
     "packages/gemini",
     "packages/middleware",
-    "packages/classifier-onnx"
+    "packages/classifier-onnx",
+    "packages/ai-sdk"
   ],
   "scripts": {
     "build": "tsc -b",

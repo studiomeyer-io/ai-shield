@@ -1,0 +1,56 @@
+{
+  "name": "ai-shield-ai-sdk",
+  "version": "0.5.0",
+  "license": "MIT",
+  "description": "AI Shield middleware for the Vercel AI SDK — input/output scanning via wrapLanguageModel",
+  "author": "StudioMeyer <hello@studiomeyer.io>",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/studiomeyer-io/ai-shield.git",
+    "directory": "packages/ai-sdk"
+  },
+  "homepage": "https://github.com/studiomeyer-io/ai-shield/tree/main/packages/ai-sdk",
+  "bugs": {
+    "url": "https://github.com/studiomeyer-io/ai-shield/issues"
+  },
+  "keywords": [
+    "llm",
+    "security",
+    "prompt-injection",
+    "pii",
+    "ai-sdk",
+    "vercel",
+    "middleware",
+    "wrapLanguageModel",
+    "ai-shield"
+  ],
+  "type": "module",
+  "files": [
+    "dist"
+  ],
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "scripts": {
+    "build": "tsc -b",
+    "typecheck": "tsc -b"
+  },
+  "peerDependencies": {
+    "ai": ">=7.0.0 <8.0.0"
+  },
+  "dependencies": {
+    "ai-shield-core": "0.5.0"
+  },
+  "devDependencies": {
+    "ai": "^7.0.14",
+    "typescript": "^5.7.0"
+  },
+  "engines": {
+    "node": ">=20.0.0"
+  }
+}
