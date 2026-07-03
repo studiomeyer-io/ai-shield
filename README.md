@@ -144,7 +144,8 @@ User Input → [AI Shield Scanner Chain] → LLM Provider
 | `ai-shield-core` | Scanner chain, PII, injection detection, tool policy, cost tracking, audit |
 | `ai-shield-openai` | Drop-in wrapper for OpenAI SDK |
 | `ai-shield-anthropic` | Drop-in wrapper for Anthropic SDK |
-| `ai-shield-gemini` | Drop-in wrapper for Google Gemini SDK |
+| `ai-shield-gemini` | Drop-in wrapper for Google Gemini SDK (deprecated `@google/generative-ai`) |
+| `ai-shield-google-genai` | Drop-in wrapper for the new unified Google Gen AI SDK (`@google/genai`) |
 | `ai-shield-ai-sdk` | Middleware for the Vercel AI SDK (`wrapLanguageModel`) |
 | `ai-shield-middleware` | Express and Hono middleware |
 
@@ -352,6 +353,50 @@ Or the one-line convenience factory:
 import { shieldModel } from "ai-shield-ai-sdk";
 
 const model = shieldModel(openai("gpt-4o"), { outputScan: true });
+```
+
+### Level 2g: Google Gen AI Wrapper (new `@google/genai` SDK)
+
+For the new unified Google Gen AI SDK (`@google/genai` — Gemini Developer API
+and Vertex AI, supersedes the deprecated `@google/generative-ai` covered by
+Level 2d/2e). Same call shape as the raw client — the model is passed per
+call, and `response.text` is an accessor property in this SDK:
+
+```ts
+import { GoogleGenAI } from "@google/genai";
+import { createShield } from "ai-shield-google-genai";
+
+const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY! });
+
+const shielded = createShield(ai, {
+  agentId: "chatbot",
+  shield: { pii: { action: "mask", locale: "de-DE" } },
+  outputScan: true, // OWASP LLM05: secret leak, SQL/XSS/shell, prompt leak
+});
+
+const response = await shielded.models.generateContent({
+  model: "gemini-2.5-flash",
+  contents: "What services do you offer?",
+});
+console.log(response.text);            // accessor survives — no spread
+console.log(response._shield?.input.safe);
+```
+
+Streaming (the new SDK yields response chunks directly — no aggregated
+`response` promise):
+
+```ts
+const stream = await shielded.models.generateContentStream({
+  model: "gemini-2.5-flash",
+  contents: "Tell me about your products",
+});
+
+for await (const chunk of stream) {
+  process.stdout.write(chunk.text ?? "");
+}
+
+console.log(stream.text);          // full accumulated response
+console.log(stream.shieldResult);  // { input, output?, outputScan? }
 ```
 
 ### Level 3: Express Middleware
@@ -1211,7 +1256,8 @@ Minimal by design. Core has zero runtime dependencies. Optional peer deps for Re
 | `pg` | No | PostgreSQL audit logging |
 | `openai` | Peer dep of `ai-shield-openai` | OpenAI SDK wrapper |
 | `@anthropic-ai/sdk` | Peer dep of `ai-shield-anthropic` | Anthropic SDK wrapper |
-| `@google/generative-ai` | Peer dep of `ai-shield-gemini` | Gemini SDK wrapper |
+| `@google/generative-ai` | Peer dep of `ai-shield-gemini` | Gemini SDK wrapper (deprecated SDK) |
+| `@google/genai` (>= 2) | Peer dep of `ai-shield-google-genai` | Google Gen AI SDK wrapper (new unified SDK) |
 | `ai` (>= 7) | Peer dep of `ai-shield-ai-sdk` | Vercel AI SDK middleware |
 | `express` | Peer dep of `ai-shield-middleware` | Express middleware |
 | `hono` | Peer dep of `ai-shield-middleware` | Hono middleware |
@@ -1223,6 +1269,7 @@ Minimal by design. Core has zero runtime dependencies. Optional peer deps for Re
 ### On main (next release)
 
 - [x] **Vercel AI SDK middleware** (`ai-shield-ai-sdk`) — `wrapLanguageModel` integration for `ai` >= 7: input scan in `transformParams` (block / warn / PII-mask before the provider call), optional output scanning surfaced via `providerMetadata.aiShield` on generate results and `finish` stream parts
+- [x] **`@google/genai` wrapper** (`ai-shield-google-genai`) — the new unified Google Gen AI SDK (supersedes `@google/generative-ai`): input scan / block / PII-mask before `ai.models.generateContent` and `generateContentStream`, optional output scanning in `_shield` / `shieldResult`, per-call model cost tracking
 
 ### Shipped in v0.5.0 (this release)
 
@@ -1259,7 +1306,6 @@ Minimal by design. Core has zero runtime dependencies. Optional peer deps for Re
 
 ### Next
 
-- [ ] `@google/genai` wrapper (new Gemini SDK, replacing `@google/generative-ai`)
 - [ ] Bloom filter for known-good/bad inputs
 - [ ] PostgreSQL audit store (`store: "postgresql"` currently falls back to console)
 - [ ] Toxicity / bias detection

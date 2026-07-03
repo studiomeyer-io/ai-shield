@@ -31,6 +31,42 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   filter, stream passthrough, stream finish-part metadata, stream block,
   tool-name context, contextFactory, convenience factory) — 716 → 735 total.
 
+- **`ai-shield-google-genai`** — new sibling package: AI Shield wrapper for
+  the NEW unified Google Gen AI SDK (`@google/genai`, verified against
+  2.10.0 — Gemini Developer API + Vertex AI). Supersedes-companion to
+  `ai-shield-gemini`, which keeps wrapping the deprecated
+  `@google/generative-ai` SDK untouched for back-compat. `createShield(ai)`
+  wraps the `GoogleGenAI` client and exposes a drop-in
+  `shielded.models.generateContent({ model, contents, config })` /
+  `generateContentStream` surface: the input scan chain runs BEFORE the
+  model call (a `block` decision throws `ShieldBlockError` without invoking
+  the model, `warn` fires `onWarning`, PII masking rewrites the outgoing
+  user contents — `contents` normalization mirrors the SDK's own `tContents`
+  transformer: string/part → one user content, part arrays accumulate, content
+  arrays pass through). Optional output scanning (`scanOutput` legacy chain
+  and/or the dedicated v0.3 `outputScan` scanner) lands in `response._shield`
+  and, for streams, in `shieldResult` after completion (reported, not
+  blocked). New-SDK adaptations vs the old wrapper: `response.text` is an
+  accessor property (results are returned with `_shield` attached to the
+  instance instead of spread, so the prototype accessor survives), streaming
+  yields `GenerateContentResponse` chunks directly (usage metadata is
+  captured from the final chunk — no aggregated `response` promise), and
+  budget checks / cost records use the per-call `params.model` (no
+  `modelName` config needed). Tool names for policy context are read from
+  `config.tools[].functionDeclarations`. Duck-typed like the other wrappers
+  (zero hard SDK dependency) with a compile-time compatibility proof
+  (`src/compat-check.ts`) asserting the duck types against the real
+  `@google/genai` declarations at `tsc -b` time. `@google/genai` is a peer
+  dependency (`>=2.0.0 <3.0.0`), runtime deps are `ai-shield-core` only, and
+  core itself is untouched. 27 new unit tests
+  (`tests/unit/google-genai-wrapper.test.ts` +
+  `tests/unit/google-genai-stream.test.ts`) mirror the gemini mock-client
+  style against the new surface (block + model-never-called, allow, contents
+  normalization shapes, PII-mask capture, callbacks, legacy + dedicated
+  output scan, prototype/accessor preservation, tool context, per-call-model
+  cost recording, stream passthrough/block/scan/usage-capture/mask) —
+  735 → 762 total.
+
 ## [0.5.1] — `ai-shield-classifier-onnx` packaging hotfix (2026-06-22)
 
 Single-package patch — `ai-shield-classifier-onnx` only. The other five
