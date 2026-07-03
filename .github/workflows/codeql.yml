@@ -1,0 +1,49 @@
+name: CodeQL
+
+# Static security analysis for a security-focused library. Runs as its own
+# workflow (separate from ci.yml) so it never blocks the typecheck/test gate —
+# findings surface in the repository Security tab, not as a red required check
+# unless branch protection is configured to require it.
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  schedule:
+    # Weekly, Monday 06:24 UTC — catch newly-published CodeQL queries against
+    # code that hasn't changed.
+    - cron: "24 6 * * 1"
+
+permissions:
+  contents: read
+
+jobs:
+  analyze:
+    name: Analyze (${{ matrix.language }})
+    runs-on: ubuntu-latest
+    permissions:
+      security-events: write
+      actions: read
+      contents: read
+    strategy:
+      fail-fast: false
+      matrix:
+        language: [javascript-typescript]
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Initialize CodeQL
+        uses: github/codeql-action/init@v3
+        with:
+          languages: ${{ matrix.language }}
+          # Extended query suite — appropriate for a security library where the
+          # extra coverage is worth the small increase in review surface.
+          queries: security-extended
+
+      - name: Perform CodeQL Analysis
+        uses: github/codeql-action/analyze@v3
+        with:
+          category: "/language:${{ matrix.language }}"

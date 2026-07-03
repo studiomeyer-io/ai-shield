@@ -1,0 +1,32 @@
+name: Dependency Review
+
+# Blocks a PR that introduces a dependency with a known high/critical
+# advisory. PR-only, so it never touches the main-branch build. Pairs with the
+# existing Dependabot config (.github/dependabot.yml), which auto-applies
+# security advisories out of band — this action stops a vulnerable dep from
+# entering via a human PR in the first place.
+
+on:
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  dependency-review:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: write
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Dependency Review
+        uses: actions/dependency-review-action@v4
+        with:
+          # Only high/critical fails the check — core ships zero runtime deps,
+          # so in practice this gates the dev/peer dependency surface.
+          fail-on-severity: high
+          comment-summary-in-pr: on-failure
