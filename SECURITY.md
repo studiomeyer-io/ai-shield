@@ -31,16 +31,35 @@ The following are out of scope:
 
 ## Known Limitations
 
-AI Shield uses **pattern-based detection**, not ML-based analysis. This means:
+The zero-dependency `ai-shield-core` defaults to **pattern-based detection**
+(40+ scored heuristics with Unicode/leetspeak/typoglycemia/letter-splitting
+normalisation). Two **optional** semantic layers can be composed on top: the
+ONNX DeBERTa classifier (`ai-shield-classifier-onnx`) and the async
+LLM-as-judge (`createAsyncJudge`). Even with all three layers, no input filter
+is a complete defence. This means:
 
-- **Novel prompt injection attacks** may bypass heuristic patterns until new patterns are added
-- **Encoding evasion** (e.g., Base64 split across multiple messages) has limited detection
-- **Defense in depth** is recommended — AI Shield should be one layer in your security stack, not the only one
+- **Novel prompt injection attacks** may bypass the heuristic patterns until
+  new patterns are added; the optional ML/judge layers narrow but do not close
+  that gap.
+- **Indirect injection is the larger risk.** Payloads arriving through RAG
+  documents, tool descriptions/outputs, stored memory or another agent's output
+  are the dominant 2026 attack class. Use `scanIngested` / `wrapContext` /
+  `createDualLLM` for that surface — a user-input filter alone does not cover it.
+- **Encoding evasion** (e.g., Base64 split across multiple messages) has limited
+  detection.
+- **Defense in depth** is recommended — AI Shield should be one layer in your
+  security stack, not the only one. The only architecturally robust mitigation
+  is privilege separation (see "What AI Shield is NOT" in the README).
 
-We are transparent about these limitations because honest security tooling is better than false confidence.
+We are transparent about these limitations because honest security tooling is
+better than false confidence.
 
 ## Supported Versions
 
+Security fixes land on the latest published minor. Please upgrade to the current
+release line before reporting.
+
 | Version | Supported |
 |---------|-----------|
-| 0.1.x   | Yes       |
+| 0.5.x   | Yes       |
+| < 0.5   | No — please upgrade |
