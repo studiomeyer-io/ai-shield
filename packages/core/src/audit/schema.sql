@@ -1,28 +1,28 @@
 -- AI Shield Audit Schema
--- Append-only, partitioned by month for retention policies
+-- Append-only; stores hashes + metadata, never raw content (DSGVO/GDPR).
+-- Mirrors the DDL that PostgresAuditStore.ensureSchema() runs at runtime.
 
 CREATE TABLE IF NOT EXISTS ai_shield_audit (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   timestamp TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-  session_id UUID,
-  agent_id VARCHAR(64),
+  session_id TEXT,
+  agent_id TEXT,
   user_id_hash VARCHAR(64),
   request_type VARCHAR(20) NOT NULL,
   input_hash VARCHAR(64) NOT NULL,
   input_token_count INTEGER,
-  model VARCHAR(64),
+  model TEXT,
   security_decision VARCHAR(10) NOT NULL,
   security_reason TEXT,
   violations JSONB NOT NULL DEFAULT '[]',
-  scan_duration_ms INTEGER,
+  scan_duration_ms DOUBLE PRECISION,
   output_token_count INTEGER,
   tools_called TEXT[],
-  cost_usd NUMERIC(10, 6),
-  created_month DATE NOT NULL DEFAULT DATE_TRUNC('month', NOW())
-) PARTITION BY RANGE (created_month);
+  cost_usd NUMERIC(10, 6)
+);
 
 -- Indexes
-CREATE INDEX IF NOT EXISTS idx_ai_shield_audit_session ON ai_shield_audit (session_id);
+CREATE INDEX IF NOT EXISTS idx_ai_shield_audit_timestamp ON ai_shield_audit (timestamp);
 CREATE INDEX IF NOT EXISTS idx_ai_shield_audit_agent ON ai_shield_audit (agent_id, timestamp);
 CREATE INDEX IF NOT EXISTS idx_ai_shield_audit_decision ON ai_shield_audit (security_decision) WHERE security_decision != 'allow';
 CREATE INDEX IF NOT EXISTS idx_ai_shield_audit_violations ON ai_shield_audit USING GIN (violations);

@@ -67,6 +67,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   cost recording, stream passthrough/block/scan/usage-capture/mask) —
   735 → 762 total.
 
+- **PostgreSQL audit store** — `store: "postgresql"` now persists audit
+  records instead of silently falling back to console. `PostgresAuditStore`
+  writes hashes + metadata (never raw content) via a single batched,
+  parameterized multi-row INSERT through the optional `pg` peer dependency
+  (verified against `pg@8.22`); it lazily `import()`s `pg` and auto-creates
+  the `ai_shield_audit` table on first write. Accepts a connection
+  string/config or an injected pool (caller owns injected-pool lifecycle).
+  Write failures are logged to stderr and dropped — never thrown into the
+  request path — since audit is best-effort forensic logging. Exports
+  `PostgresAuditStore`, `PostgresAuditStoreConfig`, `PgPoolLike`; `pg` stays
+  an optional peer dep so core keeps zero runtime dependencies. Also
+  corrected the reference `schema.sql` (invalid partition-key PK,
+  `session_id UUID`, integer `scan_duration_ms`) to match the runtime DDL.
+  32 new unit tests — 762 → 794 total.
+
 ## [0.5.1] — `ai-shield-classifier-onnx` packaging hotfix (2026-06-22)
 
 Single-package patch — `ai-shield-classifier-onnx` only. The other five

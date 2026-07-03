@@ -70,7 +70,7 @@ AI Shield runs in-process (not as a proxy), adds <25ms latency, and works with a
 - **Token estimation is approximate.** The SDK wrappers estimate input tokens as `length * 0.75` for pre-flight budget checks. Actual token counts from the LLM response are used for cost recording.
 - **Output scanning targets injection + leakage, not quality.** `scanOutput()` (v0.3) covers OWASP LLM05 (SQL/shell/XSS/template payloads), secret leaks, system-prompt leaks and output-side PII. Output *quality* — toxicity, hallucination, bias — still requires additional tooling.
 - **Custom patterns are limited to the `instruction_override` category.** Custom regex patterns added via `injection.customPatterns` are all assigned to the `instruction_override` category with a fixed weight of 0.25.
-- **PostgreSQL audit store is planned, not yet implemented.** The `store: "postgresql"` config option currently falls back to console logging. See the Roadmap section.
+- **PostgreSQL audit store is best-effort.** The `store: "postgresql"` option persists hashes + metadata (never raw content) via batched parameterized inserts through the optional `pg` peer dependency. Write failures are logged to stderr and dropped, never thrown into the request path — durable spooling of failed batches is not implemented.
 
 ---
 
@@ -490,7 +490,7 @@ const shield = new AIShield({
 
   audit: {
     enabled: true,
-    store: "console",        // "console" | "memory" (postgresql planned)
+    store: "console",        // "console" | "memory" | "postgresql"
     batchSize: 100,
     flushIntervalMs: 1000,
   },
@@ -1064,29 +1064,32 @@ if (checkCanaryLeak(llmResponse, canaryToken)) {
 
 ## Audit Logging
 
-Batched audit logging with pluggable backends. Stores metadata and hashes (not raw content) for GDPR/DSGVO compliance. Currently supports `console` and `memory` stores. PostgreSQL store is planned (see Roadmap).
+Batched audit logging with pluggable backends. Stores metadata and hashes (not raw content) for GDPR/DSGVO compliance. Supports `console`, `memory`, and `postgresql` stores.
 
 ### PostgreSQL Schema
 
 ```sql
-CREATE TABLE ai_shield_audit (
+-- Created automatically by PostgresAuditStore.ensureSchema() on first write; shown here for reference.
+CREATE TABLE IF NOT EXISTS ai_shield_audit (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   timestamp TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   session_id TEXT,
   agent_id TEXT,
-  user_id_hash TEXT,
-  request_type TEXT NOT NULL,     -- 'chat' | 'tool_call' | 'agent_to_agent'
-  input_hash TEXT NOT NULL,       -- SHA-256, NOT the raw input
+  user_id_hash VARCHAR(64),          -- SHA-256 (truncated), NOT the raw user id
+  request_type VARCHAR(20) NOT NULL, -- 'chat' | 'tool_call'
+  input_hash VARCHAR(64) NOT NULL,   -- SHA-256, NOT the raw input
+  input_token_count INTEGER,
   model TEXT,
-  security_decision TEXT NOT NULL, -- 'allow' | 'warn' | 'block'
+  security_decision VARCHAR(10) NOT NULL, -- 'allow' | 'warn' | 'block'
   security_reason TEXT,
-  violations JSONB DEFAULT '[]',
-  scan_duration_ms REAL,
+  violations JSONB NOT NULL DEFAULT '[]',
+  scan_duration_ms DOUBLE PRECISION,
+  output_token_count INTEGER,
+  tools_called TEXT[],
   cost_usd NUMERIC(10,6)
-) PARTITION BY RANGE (timestamp);
-
--- Monthly partitions for retention management
--- Indexes on timestamp, agent_id, security_decision
+);
+CREATE INDEX IF NOT EXISTS idx_ai_shield_audit_timestamp ON ai_shield_audit (timestamp);
+CREATE INDEX IF NOT EXISTS idx_ai_shield_audit_agent ON ai_shield_audit (agent_id, timestamp);
 ```
 
 ### Configuration
@@ -1095,7 +1098,7 @@ CREATE TABLE ai_shield_audit (
 const shield = new AIShield({
   audit: {
     enabled: true,
-    store: "console",        // "console" | "memory" (postgresql planned)
+    store: "console",        // "console" | "memory" | "postgresql"
     batchSize: 100,          // flush every 100 records
     flushIntervalMs: 1000,   // or every 1 second
   },
@@ -1307,7 +1310,6 @@ Minimal by design. Core has zero runtime dependencies. Optional peer deps for Re
 ### Next
 
 - [ ] Bloom filter for known-good/bad inputs
-- [ ] PostgreSQL audit store (`store: "postgresql"` currently falls back to console)
 - [ ] Toxicity / bias detection
 - [ ] Dashboard (Next.js)
 
