@@ -28,5 +28,9 @@
       "optional": true
     }
   },
+  "devDependencies": {
+    "@types/pg": "^8.20.0",
+    "pg": "^8.22.0"
+  },
   "license": "MIT"
 }

@@ -2,6 +2,9 @@
 // AI Shield Core Types
 // ============================================================
 
+// Type-only import (erased at emit — no runtime cycle with ./audit/types.js).
+import type { AuditStore } from "./audit/types.js";
+
 // --- Scanner Types ---
 
 export type ScanDecision = "allow" | "warn" | "block";
@@ -391,7 +394,14 @@ export interface CostConfig {
 
 export interface AuditConfig {
   enabled?: boolean;
-  store?: "postgresql" | "memory" | "console";
+  /**
+   * Named store, or a custom {@link AuditStore} instance (e.g. a
+   * `PostgresAuditStore` built with an injected pool, or your own
+   * implementation). `"postgresql"` requires `connectionString`;
+   * without it the shield warns on stderr and falls back to console.
+   */
+  store?: "postgresql" | "memory" | "console" | AuditStore;
+  /** PostgreSQL connection string for `store: "postgresql"`. */
   connectionString?: string;
   batchSize?: number;
   flushIntervalMs?: number;

@@ -102,6 +102,13 @@ export { getModelPricing, estimateCost, MODEL_PRICING } from "./cost/pricing.js"
 
 // Audit
 export { AuditLogger, ConsoleAuditStore, MemoryAuditStore } from "./audit/logger.js";
+export {
+  PostgresAuditStore,
+  type PostgresAuditStoreConfig,
+  type PostgresConnectionOptions,
+  type PgPoolLike,
+  type PgQueryResultLike,
+} from "./audit/postgres.js";
 export type { AuditStore } from "./audit/types.js";
 
 // Cache

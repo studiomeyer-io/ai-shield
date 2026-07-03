@@ -6,6 +6,7 @@ import { ToolPolicyScanner } from "./policy/tools.js";
 import { PolicyEngine } from "./policy/engine.js";
 import { CostTracker } from "./cost/tracker.js";
 import { AuditLogger, ConsoleAuditStore } from "./audit/logger.js";
+import { PostgresAuditStore } from "./audit/postgres.js";
 import type { AuditStore } from "./audit/types.js";
 import { ScanLRUCache } from "./cache/lru.js";
 
@@ -214,22 +215,44 @@ export class AIShield {
   private setupAudit(config: ShieldConfig): AuditLogger | null {
     if (config.audit?.enabled === false) return null;
 
+    const configured = config.audit?.store;
+
     let store: AuditStore;
-    switch (config.audit?.store) {
-      case "console":
-        store = new ConsoleAuditStore();
-        break;
-      case "postgresql":
-        // PostgreSQL store would be imported separately to keep core lightweight
-        // For now, fall through to console
-        store = new ConsoleAuditStore();
-        break;
-      case "memory":
-      default:
-        // If no store configured and audit not explicitly enabled, skip
-        if (!config.audit?.store && config.audit?.enabled !== true) return null;
-        store = new ConsoleAuditStore();
-        break;
+    if (configured !== undefined && typeof configured !== "string") {
+      // Custom AuditStore instance — e.g. `new PostgresAuditStore({ pool })`
+      // with an injected pool, a MemoryAuditStore, or a user implementation.
+      store = configured;
+    } else {
+      switch (configured) {
+        case "console":
+          store = new ConsoleAuditStore();
+          break;
+        case "postgresql":
+          if (config.audit?.connectionString) {
+            // `pg` is imported lazily by the store on first use — core keeps
+            // zero hard runtime deps. Missing `pg` surfaces as an actionable
+            // stderr warning on the write path, never as a request failure.
+            store = new PostgresAuditStore({
+              connectionString: config.audit.connectionString,
+            });
+          } else {
+            // No connection info to build a pool from — fall back, but never
+            // silently: say so once on stderr.
+            process.stderr.write(
+              '[AI-Shield] audit store "postgresql" configured without `audit.connectionString` — ' +
+                "falling back to console audit store. Provide a connectionString, or pass a " +
+                "PostgresAuditStore instance (with an injected pool) as `audit.store`.\n",
+            );
+            store = new ConsoleAuditStore();
+          }
+          break;
+        case "memory":
+        default:
+          // If no store configured and audit not explicitly enabled, skip
+          if (!configured && config.audit?.enabled !== true) return null;
+          store = new ConsoleAuditStore();
+          break;
+      }
     }
 
     return new AuditLogger({
