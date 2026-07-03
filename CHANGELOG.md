@@ -5,6 +5,32 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Added
+
+- **`ai-shield-ai-sdk`** — new sibling package: AI Shield middleware for the
+  Vercel AI SDK (`ai` >= 7) via `wrapLanguageModel`. `aiShieldMiddleware()`
+  returns a `LanguageModelMiddleware` (verified against `ai@7.0.14` /
+  `@ai-sdk/provider@4.0.2`, the `LanguageModelV4` middleware spec) that runs
+  the input scan chain in `transformParams` BEFORE the provider call — a
+  `block` decision throws `ShieldBlockError` without ever invoking the model,
+  `warn` fires the `onWarning` callback, and PII masking rewrites the outgoing
+  prompt (user messages only, mirroring the OpenAI/Anthropic/Gemini wrappers).
+  Optional output scanning (`scanOutput` legacy chain and/or the dedicated
+  v0.3 `outputScan` scanner) runs in `wrapGenerate` / `wrapStream`; results
+  are surfaced under `providerMetadata.aiShield` on the generate result and on
+  the `finish` stream part (output findings are reported, not blocked — same
+  semantics as the other streaming wrappers). Ships a `shieldModel(model,
+  config)` convenience factory. `ai` is a peer dependency (`>=7.0.0 <8.0.0`),
+  runtime deps are `ai-shield-core` only, and core itself is untouched.
+  19 new unit tests (`tests/unit/ai-sdk-middleware.test.ts`) drive the real
+  `wrapLanguageModel` + `generateText` + `streamText` pipeline against the
+  official `ai/test` mock model (block, allow, PII-mask, multi-message mask,
+  system-prompt exclusion, callbacks, legacy + dedicated output scan, sinks
+  filter, stream passthrough, stream finish-part metadata, stream block,
+  tool-name context, contextFactory, convenience factory) — 716 → 735 total.
+
 ## [0.5.1] — `ai-shield-classifier-onnx` packaging hotfix (2026-06-22)
 
 Single-package patch — `ai-shield-classifier-onnx` only. The other five

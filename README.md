@@ -145,6 +145,7 @@ User Input → [AI Shield Scanner Chain] → LLM Provider
 | `ai-shield-openai` | Drop-in wrapper for OpenAI SDK |
 | `ai-shield-anthropic` | Drop-in wrapper for Anthropic SDK |
 | `ai-shield-gemini` | Drop-in wrapper for Google Gemini SDK |
+| `ai-shield-ai-sdk` | Middleware for the Vercel AI SDK (`wrapLanguageModel`) |
 | `ai-shield-middleware` | Express and Hono middleware |
 
 ---
@@ -316,6 +317,41 @@ for await (const chunk of stream) {
 console.log(stream.text);          // full accumulated response
 console.log(stream.done);          // true
 console.log(stream.shieldResult);  // { input, output }
+```
+
+### Level 2f: Vercel AI SDK (middleware)
+
+Works with any AI SDK provider via `wrapLanguageModel` (`ai` >= 7). The input
+scan runs in `transformParams` BEFORE the provider is called — a `block`
+decision throws `ShieldBlockError` and the model is never invoked, PII masking
+rewrites the outgoing prompt. Optional output scanning attaches its findings
+under `providerMetadata.aiShield` (on the `finish` part for streams).
+
+```ts
+import { openai } from "@ai-sdk/openai";
+import { generateText, wrapLanguageModel } from "ai";
+import { aiShieldMiddleware } from "ai-shield-ai-sdk";
+
+const model = wrapLanguageModel({
+  model: openai("gpt-4o"),
+  middleware: aiShieldMiddleware({
+    agentId: "chatbot",
+    shield: { pii: { action: "mask", locale: "de-DE" } },
+    outputScan: true, // OWASP LLM05: secret leak, SQL/XSS/shell, prompt leak
+  }),
+});
+
+// Every generateText / streamText call is automatically scanned
+const { text, providerMetadata } = await generateText({ model, prompt: userInput });
+console.log(providerMetadata?.aiShield); // { input, outputScan }
+```
+
+Or the one-line convenience factory:
+
+```ts
+import { shieldModel } from "ai-shield-ai-sdk";
+
+const model = shieldModel(openai("gpt-4o"), { outputScan: true });
 ```
 
 ### Level 3: Express Middleware
@@ -1176,12 +1212,17 @@ Minimal by design. Core has zero runtime dependencies. Optional peer deps for Re
 | `openai` | Peer dep of `ai-shield-openai` | OpenAI SDK wrapper |
 | `@anthropic-ai/sdk` | Peer dep of `ai-shield-anthropic` | Anthropic SDK wrapper |
 | `@google/generative-ai` | Peer dep of `ai-shield-gemini` | Gemini SDK wrapper |
+| `ai` (>= 7) | Peer dep of `ai-shield-ai-sdk` | Vercel AI SDK middleware |
 | `express` | Peer dep of `ai-shield-middleware` | Express middleware |
 | `hono` | Peer dep of `ai-shield-middleware` | Hono middleware |
 
 ---
 
 ## Roadmap
+
+### On main (next release)
+
+- [x] **Vercel AI SDK middleware** (`ai-shield-ai-sdk`) — `wrapLanguageModel` integration for `ai` >= 7: input scan in `transformParams` (block / warn / PII-mask before the provider call), optional output scanning surfaced via `providerMetadata.aiShield` on generate results and `finish` stream parts
 
 ### Shipped in v0.5.0 (this release)
 
