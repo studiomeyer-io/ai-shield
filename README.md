@@ -18,7 +18,7 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 [![TypeScript](https://img.shields.io/badge/TypeScript-strict-blue.svg)](tsconfig.json)
 [![Zero Dependencies](https://img.shields.io/badge/dependencies-0-brightgreen.svg)](package.json)
-[![Tests: 710 passing](https://img.shields.io/badge/tests-710%20passing-brightgreen.svg)](tests/)
+[![Tests: 712 passing](https://img.shields.io/badge/tests-712%20passing-brightgreen.svg)](tests/)
 
 Prompt injection detection (incl. unicode-tag / leetspeak / typoglycemia / letter-splitting / multilingual evasion) · Indirect-injection (RAG / tool-desc / tool-output / memory / web) · Output scanning (SQL / shell / XSS / secret leak) · PII protection · Trust-tier context streams · Multi-agent trust propagation · Dual-LLM privilege separation · Memory poisoning detection · Tool policy enforcement · Circuit breakers · Async LLM-judge · Cost tracking · Audit logging
 
@@ -1124,22 +1124,10 @@ ai-shield/
 │           ├── express.ts     Express middleware
 │           └── hono.ts        Hono middleware
 │
-├── tests/
-│   └── unit/
-│       ├── heuristic.test.ts         42 tests
-│       ├── cost.test.ts              26 tests
-│       ├── pii.test.ts               20 tests
-│       ├── policy-engine.test.ts     16 tests
-│       ├── chain.test.ts             15 tests
-│       ├── middleware.test.ts         13 tests
-│       ├── shield.test.ts            13 tests
-│       ├── audit.test.ts             13 tests
-│       ├── tools.test.ts             12 tests
-│       ├── openai-wrapper.test.ts     9 tests
-│       ├── canary.test.ts             7 tests
-│       ├── gemini-wrapper.test.ts    12 tests
-│       ├── gemini-stream.test.ts     5 tests
-│       └── anthropic-wrapper.test.ts  7 tests
+├── tests/                     43 files · 712 cases (vitest)
+│   ├── unit/                  scanners, policy, cost, wrappers, middleware
+│   ├── integration/           defense-in-depth + full-pipeline
+│   └── corpus/                labelled attack / benign harness (0% FP bar)
 │
 ├── package.json               Monorepo root (npm workspaces)
 ├── tsconfig.json              Strict TypeScript
@@ -1151,34 +1139,29 @@ ai-shield/
 ## Tests
 
 ```bash
-npm test            # 672 tests, ~1s
+npm test            # 712 tests across 43 files, ~1.3s
 ```
 
-| Suite | Tests | Covers |
-|-------|------:|--------|
-| Heuristic | 42 | 23 injection prompts, 15 clean prompts, config, performance |
-| Cost | 26 | Budget checks, cost recording, pricing table, anomaly z-score |
-| LRU Cache | 20 | Get/set, LRU eviction, TTL expiry, prune, AIShield integration |
-| PII | 20 | IBAN, credit card, email, phone, tax ID, IP, URL, masking, modes |
-| PII Extended | 16 | Edge cases, overlap dedup, multi-type |
-| Policy Engine | 16 | All 3 presets, thresholds, PII actions, tool policies, budgets |
-| Heuristic Extended | 15 | Advanced patterns, structural signals, edge cases |
-| Scanner Chain | 15 | Execution, escalation, early-exit, sanitization, metadata |
-| Full Pipeline | 14 | End-to-end integration, preset combos |
-| Middleware | 13 | Input extraction (6 fields + messages[]), blocked response format |
-| Shield | 13 | Default config, presets, tool policy, cost, convenience, metadata |
-| Audit | 13 | Logging, SHA-256 hashing, batching, flush, close |
-| Gemini Wrapper | 12 | Clean input (string, array, params), injection blocking, PII masking, callbacks, output scan, tool context |
-| Tool Policy | 12 | Allow/deny, wildcards, manifest pin/drift, performance |
-| OpenAI Stream | 10 | Chunk accumulation, pre-stream blocking, cost recording, done/text props |
-| Middleware Express | 10 | Express integration, error handling, skip paths |
-| OpenAI Wrapper | 9 | Clean input, injection blocking, PII masking, callbacks, output scan |
-| Anthropic Stream | 9 | Chunk accumulation, pre-stream blocking, cost recording, output scan |
-| Middleware Hono | 8 | Hono integration, context injection |
-| Singleton | 8 | Instance management, config reuse |
-| Canary | 7 | Token injection, uniqueness, leak detection |
-| Anthropic Wrapper | 7 | Clean input, injection blocking, PII masking, multi-block, output scan |
-| Gemini Stream | 10 | Chunk accumulation, pre-stream blocking, output scan, shieldResult, response promise, done state, onBlocked callback, modelName config |
+Counts below are grouped by area and sum to the full suite; run `npm test` for
+the authoritative number.
+
+| Area | Tests | Covers |
+|------|------:|--------|
+| Injection detection (heuristic + evasion views + corpus) | 139 | 40+ patterns, unicode-tag / homoglyph / zero-width / leetspeak / letter-splitting / typoglycemia / policy-puppetry, structural signals, attack-corpus harness (0% FP bar) |
+| Indirect injection (RAG / tool-desc / tool-output / memory / web / agent) | 60 | Source-profiled `scanIngested`, `scanToolOutput`, multi-agent `propagateTrust` contagion |
+| Trust-tier context + dual-LLM | 42 | `wrapContext` / `assemblePrompt` fencing, `createDualLLM` privilege separation, action screening |
+| Memory canary (persistence poisoning) | 44 | Mint / verify / rotate, tenant-mismatch, sentinel honeypots, bulk sweep |
+| Circuit breakers (runtime tool guard) | 40 | Rate limit, blast-radius cap, trip + cooldown, HITL hook, LRU key eviction |
+| PII detection | 48 | IBAN (mod-97) / credit card (Luhn) / email / phone / tax ID / IP / URL, masking, overlap dedup, 40+ IBAN countries |
+| SDK wrappers (OpenAI / Anthropic / Gemini incl. streaming) | 57 | Clean/injection/PII paths, pre-stream blocking, cost recording, output scan, callbacks |
+| Shield core / chain / cache / singleton | 76 | Config + presets, escalation + early-exit, LRU cache, singleton reuse, v0.3 review-fix regressions |
+| Cost tracking + anomaly | 31 | Budget checks, pricing table, z-score anomaly, records ring-buffer cap |
+| ML classifier (optional ONNX) | 31 | `Scanner` interface, hermetic mock runtime + tokenizer, graceful-degrade |
+| Output scanning (v0.3) | 21 | Secret leak / SQL-shell-XSS / system-prompt leak / jailbreak / output-side PII |
+| Middleware (Express / Hono) | 31 | Input extraction, blocked-response format, skip paths, context injection |
+| Policy + tool manifest | 28 | 3 presets, allow/deny wildcards, SHA-256 manifest pin/drift |
+| Integration (defense-in-depth + full pipeline) | 34 | End-to-end v0.2 layering + preset combos |
+| Audit / canary / async-judge | 30 | SHA-256 hashing + batching, system-prompt canary, off-hot-path judge verdicts |
 
 ---
 
