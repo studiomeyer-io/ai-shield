@@ -54,7 +54,7 @@ From a small studio in Palma de Mallorca.
 
 ## Why
 
-- **No npm package exists** for developer-first LLM security
+- **Defense in depth, not a single filter** — pattern + optional ML + LLM-judge + dual-LLM privilege separation + memory canary + circuit breakers, in one zero-dependency TS core
 - EU AI Act High-Risk enforcement starts August 2026
 - Every AI agent, chatbot, and MCP tool needs input validation
 - PII leaks through LLMs are a GDPR liability
