@@ -31,7 +31,8 @@
     "packages/gemini",
     "packages/middleware",
     "packages/classifier-onnx",
-    "packages/ai-sdk"
+    "packages/ai-sdk",
+    "packages/google-genai"
   ],
   "scripts": {
     "build": "tsc -b",

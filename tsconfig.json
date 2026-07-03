@@ -25,6 +25,7 @@
     { "path": "packages/gemini" },
     { "path": "packages/middleware" },
     { "path": "packages/classifier-onnx" },
-    { "path": "packages/ai-sdk" }
+    { "path": "packages/ai-sdk" },
+    { "path": "packages/google-genai" }
   ]
 }

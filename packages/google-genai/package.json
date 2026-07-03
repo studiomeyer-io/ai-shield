@@ -1,0 +1,56 @@
+{
+  "name": "ai-shield-google-genai",
+  "version": "0.5.0",
+  "license": "MIT",
+  "description": "AI Shield wrapper for the Google Gen AI SDK (@google/genai) — automatic input/output scanning",
+  "author": "StudioMeyer <hello@studiomeyer.io>",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/studiomeyer-io/ai-shield.git",
+    "directory": "packages/google-genai"
+  },
+  "homepage": "https://github.com/studiomeyer-io/ai-shield/tree/main/packages/google-genai",
+  "bugs": {
+    "url": "https://github.com/studiomeyer-io/ai-shield/issues"
+  },
+  "keywords": [
+    "llm",
+    "security",
+    "prompt-injection",
+    "pii",
+    "gemini",
+    "google",
+    "genai",
+    "vertex-ai",
+    "ai-shield"
+  ],
+  "type": "module",
+  "files": [
+    "dist"
+  ],
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "scripts": {
+    "build": "tsc -b",
+    "typecheck": "tsc -b"
+  },
+  "peerDependencies": {
+    "@google/genai": ">=2.0.0 <3.0.0"
+  },
+  "dependencies": {
+    "ai-shield-core": "0.5.0"
+  },
+  "devDependencies": {
+    "@google/genai": "^2.10.0",
+    "typescript": "^5.7.0"
+  },
+  "engines": {
+    "node": ">=20.0.0"
+  }
+}
