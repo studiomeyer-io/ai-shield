@@ -29,7 +29,7 @@
     }
   },
   "devDependencies": {
-    "@types/pg": "^8.20.0",
+    "@types/pg": "^8.20.4",
     "pg": "^8.22.0"
   },
   "license": "MIT"

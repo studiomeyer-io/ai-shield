@@ -42,7 +42,7 @@
   "devDependencies": {
     "@types/express": "^5.0.0",
     "express": "^4.22.2",
-    "hono": "^4.12.32",
+    "hono": "^4.13.0",
     "typescript": "^5.7.0"
   }
 }
