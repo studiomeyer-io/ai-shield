@@ -145,9 +145,11 @@ User Input → [AI Shield Scanner Chain] → LLM Provider
 | `ai-shield-openai` | Drop-in wrapper for OpenAI SDK |
 | `ai-shield-anthropic` | Drop-in wrapper for Anthropic SDK |
 | `ai-shield-gemini` | Drop-in wrapper for Google Gemini SDK (deprecated `@google/generative-ai`) |
-| `ai-shield-google-genai` | Drop-in wrapper for the new unified Google Gen AI SDK (`@google/genai`) |
-| `ai-shield-ai-sdk` | Middleware for the Vercel AI SDK (`wrapLanguageModel`) |
+| `ai-shield-google-genai` ⚠️ | Drop-in wrapper for the new unified Google Gen AI SDK (`@google/genai`) |
+| `ai-shield-ai-sdk` ⚠️ | Middleware for the Vercel AI SDK (`wrapLanguageModel`) |
 | `ai-shield-middleware` | Express and Hono middleware |
+
+⚠️ **Not published to npm yet.** `ai-shield-google-genai` and `ai-shield-ai-sdk` live in this repository and are built from source, but they are not on the npm registry — `npm install` will return a 404. Use them via a workspace checkout until the first release; every other package in the table installs normally.
 
 ---
 
