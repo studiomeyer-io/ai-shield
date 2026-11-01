@@ -190,6 +190,19 @@ export class ShieldedGemini {
     return parts.join("\n");
   }
 
+  /** Function responses can use the user or function role. */
+  private extractToolContent(contents: GeminiContent[]): string {
+    const text: string[] = [];
+    for (const content of contents) {
+      if (content.role === "model") continue;
+      for (const part of content.parts) {
+        if (part.functionResponse)
+          text.push(JSON.stringify(part.functionResponse.response));
+      }
+    }
+    return text.join("\n");
+  }
+
   /** Scan input and validate budget — shared between streaming and non-streaming */
   private async scanInput(
     request: GenerateContentParams | string | Array<string | GeminiPart>,
@@ -206,7 +219,39 @@ export class ShieldedGemini {
     const userContent = this.extractUserContent(params.contents);
 
     // --- Scan input ---
-    const inputResult = await shieldInstance.scan(userContent, context);
+    let inputResult = await shieldInstance.scan(userContent, context);
+
+    // Tool results are untrusted input too. Keep their wire representation
+    // intact; this is a detection gate, not a structured tool-data redactor.
+    const toolContent = this.extractToolContent(params.contents);
+    if (inputResult.decision !== "block" && toolContent) {
+      const toolResult = await shieldInstance.scan(toolContent, {
+        ...context,
+        source: "tool-output",
+      });
+      inputResult = {
+        ...inputResult,
+        safe: inputResult.safe && toolResult.safe,
+        decision:
+          toolResult.decision === "block"
+            ? "block"
+            : inputResult.decision === "warn" || toolResult.decision === "warn"
+              ? "warn"
+              : "allow",
+        violations: [...inputResult.violations, ...toolResult.violations],
+        meta: {
+          scanDurationMs:
+            inputResult.meta.scanDurationMs + toolResult.meta.scanDurationMs,
+          scannersRun: [
+            ...new Set([
+              ...inputResult.meta.scannersRun,
+              ...toolResult.meta.scannersRun,
+            ]),
+          ],
+          cached: inputResult.meta.cached && toolResult.meta.cached,
+        },
+      };
+    }
 
     if (inputResult.decision === "block") {
       this.config.onBlocked?.(inputResult, params.contents);

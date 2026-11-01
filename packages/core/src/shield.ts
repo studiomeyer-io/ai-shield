@@ -56,21 +56,46 @@ export class AIShield {
 
   /** Scan input text — the main API */
   async scan(input: string, context: ScanContext = {}): Promise<ScanResult> {
-    // Input-length guard — without this a user-supplied multi-MB prompt would
-    // trigger every regex scan on the full buffer, which is O(n) best-case
-    // but pathological under ReDoS-prone patterns. 256 KB handles every
-    // real chat/tool input we care about with plenty of headroom; override
-    // via AI_SHIELD_MAX_INPUT_BYTES when needed.
-    const maxInputBytes = Number(
-      process.env.AI_SHIELD_MAX_INPUT_BYTES ?? 262_144,
-    );
-    if (input.length > maxInputBytes) {
-      input = input.slice(0, maxInputBytes);
-    }
-
     // Apply preset if not set in context
     if (!context.preset) {
       context.preset = this.config.preset ?? "public_website";
+    }
+
+    // Fail closed before scanning. Measure UTF-8 bytes; an invalid override
+    // cannot disable the guard. Preserve the original text in the result.
+    const guardStart = performance.now();
+    const configuredLimit = Number(
+      process.env.AI_SHIELD_MAX_INPUT_BYTES ?? 262_144,
+    );
+    const maxInputBytes =
+      Number.isSafeInteger(configuredLimit) && configuredLimit > 0
+        ? configuredLimit
+        : 262_144;
+    if (
+      input.length > maxInputBytes ||
+      Buffer.byteLength(input, "utf8") > maxInputBytes
+    ) {
+      const result: ScanResult = {
+        safe: false,
+        decision: "block",
+        sanitized: input,
+        violations: [
+          {
+            type: "content_policy",
+            scanner: "input-size",
+            score: 1,
+            threshold: 1,
+            message: `Input exceeds the ${maxInputBytes}-byte UTF-8 scan limit`,
+          },
+        ],
+        meta: {
+          scanDurationMs: performance.now() - guardStart,
+          scannersRun: ["input-size"],
+          cached: false,
+        },
+      };
+      if (this.auditLogger) void this.auditLogger.log(input, result, context);
+      return result;
     }
 
     // Check cache
@@ -188,7 +213,13 @@ export class AIShield {
       this.chain.add(
         new HeuristicScanner({
           strictness: config.injection?.strictness ?? "medium",
-          threshold: config.injection?.threshold ?? preset.injection.threshold,
+          // Explicit threshold wins; explicit strictness uses the scanner's
+          // thresholds. With neither option, preserve the preset's default.
+          threshold:
+            config.injection?.threshold ??
+            (config.injection?.strictness === undefined
+              ? preset.injection.threshold
+              : undefined),
           customPatterns: config.injection?.customPatterns?.map(
             (pattern, i) => ({
               id: `CUSTOM-${i + 1}`,

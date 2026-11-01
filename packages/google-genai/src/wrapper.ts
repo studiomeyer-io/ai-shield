@@ -1,4 +1,11 @@
 import type {
+  Part,
+  Content,
+  ContentListUnion,
+  GenerateContentConfig,
+  GenerateContentParameters,
+} from "@google/genai";
+import type {
   AIShield,
   ShieldConfig,
   ScanContext,
@@ -54,56 +61,13 @@ export interface ShieldedGoogleGenAIConfig {
   onWarning?: (result: ScanResult, contents: GenAIContent[]) => void;
 }
 
-// --- Google Gen AI SDK types (minimal, duck-typed to avoid a hard
-// dependency; `src/compat-check.ts` proves compatibility with the real
-// `@google/genai` types at compile time) ---
-
-/** Request-side part (`Part`). Extra SDK fields pass through untouched. */
-export interface GenAIPart {
-  text?: string;
-  /** Model reasoning marker — thought parts are model output, never scanned input. */
-  thought?: boolean;
-  [key: string]: unknown;
-}
-
-/** Request-side content (`Content`) — role + parts, both optional in the new SDK. */
-export interface GenAIContent {
-  role?: string;
-  parts?: GenAIPart[];
-}
-
-/** `ContentListUnion` — everything `contents` accepts in the new SDK. */
-export type GenAIContents =
-  | string
-  | GenAIPart
-  | GenAIContent
-  | Array<string | GenAIPart>
-  | GenAIContent[];
-
-interface GenAIFunctionDeclarationLike {
-  name?: string;
-  description?: string;
-  [key: string]: unknown;
-}
-
-interface GenAIToolLike {
-  functionDeclarations?: GenAIFunctionDeclarationLike[];
-  [key: string]: unknown;
-}
-
-/** `GenerateContentConfig` — only the fields the wrapper reads are typed. */
-export interface GenAIGenerateContentConfig {
-  systemInstruction?: string | GenAIContent;
-  tools?: GenAIToolLike[];
-  [key: string]: unknown;
-}
-
-/** `GenerateContentParameters` — the new SDK takes the model per call. */
-export interface GenAIGenerateContentParams {
-  model: string;
-  contents: GenAIContents;
-  config?: GenAIGenerateContentConfig;
-}
+// Type-only aliases use SDK names present at the declared 2.0.0 floor.
+// They accept real SDK request variables without a hard runtime import.
+export type GenAIPart = Part;
+export type GenAIContent = Content;
+export type GenAIContents = ContentListUnion;
+export type GenAIGenerateContentConfig = GenerateContentConfig;
+export type GenAIGenerateContentParams = GenerateContentParameters;
 
 interface GenAIUsageMetadata {
   promptTokenCount?: number;
@@ -268,6 +232,7 @@ export class ShieldedGoogleGenAI {
     if (tools) {
       const toolNames: Array<{ name: string }> = [];
       for (const tool of tools) {
+        if (!("functionDeclarations" in tool)) continue;
         for (const fn of tool.functionDeclarations ?? []) {
           if (typeof fn.name === "string" && fn.name.length > 0) {
             toolNames.push({ name: fn.name });
@@ -300,6 +265,26 @@ export class ShieldedGoogleGenAI {
     return parts.join("\n");
   }
 
+  /** Function-response JSON is data from a tool, regardless of content role. */
+  private extractToolContent(contents: GenAIContent[]): string {
+    const text: string[] = [];
+    for (const content of contents) {
+      if (content.role === "model") continue;
+      for (const part of content.parts ?? []) {
+        const response = part.functionResponse;
+        if (
+          response &&
+          typeof response === "object" &&
+          "response" in response
+        ) {
+          const serialized = JSON.stringify(response.response);
+          if (serialized) text.push(serialized);
+        }
+      }
+    }
+    return text.join("\n");
+  }
+
   /** Scan input and validate budget — shared between streaming and non-streaming */
   private async scanInput(params: GenAIGenerateContentParams): Promise<{
     shieldInstance: AIShield;
@@ -313,7 +298,39 @@ export class ShieldedGoogleGenAI {
     const userContent = this.extractUserContent(contents);
 
     // --- Scan input ---
-    const inputResult = await shieldInstance.scan(userContent, context);
+    let inputResult = await shieldInstance.scan(userContent, context);
+
+    // Tool results are untrusted input too. Keep their wire representation
+    // intact; this is a detection gate, not a structured tool-data redactor.
+    const toolContent = this.extractToolContent(contents);
+    if (inputResult.decision !== "block" && toolContent) {
+      const toolResult = await shieldInstance.scan(toolContent, {
+        ...context,
+        source: "tool-output",
+      });
+      inputResult = {
+        ...inputResult,
+        safe: inputResult.safe && toolResult.safe,
+        decision:
+          toolResult.decision === "block"
+            ? "block"
+            : inputResult.decision === "warn" || toolResult.decision === "warn"
+              ? "warn"
+              : "allow",
+        violations: [...inputResult.violations, ...toolResult.violations],
+        meta: {
+          scanDurationMs:
+            inputResult.meta.scanDurationMs + toolResult.meta.scanDurationMs,
+          scannersRun: [
+            ...new Set([
+              ...inputResult.meta.scannersRun,
+              ...toolResult.meta.scannersRun,
+            ]),
+          ],
+          cached: inputResult.meta.cached && toolResult.meta.cached,
+        },
+      };
+    }
 
     if (inputResult.decision === "block") {
       this.config.onBlocked?.(inputResult, contents);

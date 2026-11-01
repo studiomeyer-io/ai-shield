@@ -7,6 +7,34 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+Local release candidate: **0.5.2**, independently accepted in R3. All eight prepared archives remain unpublished; no release publication is implied by this acceptance.
+
+### Security
+
+- Fix ROLE-007 repeated-trigger quadratic rescanning while preserving same-line suffix matching; add the actual-scanner `bench:redos` growth gate to CI.
+- Honor explicit injection configuration in this order: threshold, strictness, preset. Explicit medium uses the existing 0.30 threshold.
+- Block input exceeding the configured UTF-8 byte limit before scanner/cache work; preserve original input without silent clipping. The default remains 262,144 bytes, overridable with AI_SHIELD_MAX_INPUT_BYTES.
+- Scan supported textual/JSON tool results before provider calls in all five SDK adapters, including streaming. Keep explicit injection disabling, structured payloads and existing provider interfaces intact. Binary payloads and historical system/assistant/model messages remain outside this scan.
+
+### Packaging and compatibility
+
+- Include declared dist JavaScript/type entrypoints in the OpenAI, Anthropic, legacy Gemini and middleware tarballs. Add test:package-exports over all eight workspace tarballs and wire it into CI.
+- Fix OpenAI wrapper declarations for real SDK4/6 constructor/request types without changing its public peer range. Packed consumers compile in strict TypeScript and exercise actual nonstreaming/SSE SDK paths through a local fetch stub on Node 20/22; add the development-client test:openai-compat CI gate.
+- Refresh the development tree to remove all 15 measured audit findings; production remains at zero. The root development SDK update does not widen or narrow published consumer support. Release metadata is prepared at 0.5.2; no package publication is included.
+
+### Release-candidate consumer checks
+
+- Add test:openai-peers using packed consumers, including the declared OpenAI 4.0.0 floor, strict TypeScript with skipLibCheck:false and actual streaming/nonstreaming SDK calls. Preserve the published OpenAI peer/engine contract.
+- Give the unpublished ai-shield-ai-sdk adapter an honest Node>=22 floor for AI 7/provider 4, and declare @types/json-schema for its public declarations. Existing published wrappers retain their engine/peer metadata.
+- Add test:new-sdk-peers for actual AI SDK 7.0.0/7.0.159 and Google Gen AI 2.0.0/2.32.0 consumers. The release builder passes 19 checks. Independent R3 review passes the full 871-test Node 20 suite and strict fresh consumers. Google Gen AI JSON/SSE paths run on Node 20/22; AI7 retains its Node 22 engine requirement. CI runs the complete new peer gate on Node 22 and the GenAI-only gate on Node 20.
+
+- Include the exact root MIT LICENSE in all eight 0.5.2 archives. Independent tarball entrypoint/type/runtime checks and SHA256SUMS verification pass; these checks do not publish packages.
+
+### Documentation
+
+- Replace universal latency, ReDoS and detection/false-positive claims with reproducible growth and coverage commands and their measured limits. The original corpus is a regression self-check.
+- Identify the AI SDK and unified Google Gen AI packages as source workspaces pending first npm publication.
+
 ### Added
 
 - **`ai-shield-ai-sdk`** — new sibling package: AI Shield middleware for the

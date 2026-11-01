@@ -516,7 +516,10 @@ const PATTERNS: PatternRule[] = [
   {
     id: "ROLE-007",
     category: "role_manipulation",
-    pattern: /\bDAN\b.*\b(do\s+anything|no\s+(restrictions?|limits?|filters?))/i,
+    // A gap cannot cross another DAN token. The last DAN before a matching
+    // suffix still matches, preserving the old same-line behavior while each
+    // gap is scanned once instead of re-scanning it for every repeated DAN.
+    pattern: /\bDAN\b(?:(?!\bDAN\b).)*\b(do\s+anything|no\s+(restrictions?|limits?|filters?))/i,
     weight: 0.35,
     description: "DAN jailbreak pattern",
   },

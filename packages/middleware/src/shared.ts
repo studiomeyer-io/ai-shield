@@ -51,12 +51,27 @@ export function defaultGetInput(body: unknown): string | null {
 
   // OpenAI-style messages array
   if (Array.isArray(obj.messages)) {
-    const userMessages = (
-      obj.messages as Array<{ role?: string; content?: string }>
-    )
-      .filter((m) => m.role === "user" && typeof m.content === "string")
-      .map((m) => m.content as string);
-    if (userMessages.length > 0) return userMessages.join("\n");
+    const parts: string[] = [];
+    for (const message of obj.messages) {
+      if (!message || typeof message !== "object") continue;
+      const msg = message as Record<string, unknown>;
+      if (msg.role !== "user" && msg.role !== "tool" && msg.role !== "function")
+        continue;
+      if (typeof msg.content === "string") parts.push(msg.content);
+      else if (Array.isArray(msg.content)) {
+        for (const block of msg.content) {
+          if (
+            block &&
+            typeof block === "object" &&
+            block.type === "text" &&
+            typeof block.text === "string"
+          ) {
+            parts.push(block.text);
+          }
+        }
+      }
+    }
+    if (parts.length > 0) return parts.join("\n");
   }
 
   return null;

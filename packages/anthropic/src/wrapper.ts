@@ -201,6 +201,44 @@ export class ShieldedAnthropic {
     return mod.scanOutput(text, cfg, context);
   }
 
+  /** Extract textual content from tool results, excluding binary image data. */
+  private extractToolContent(messages: AnthropicMessage[]): string {
+    const text: string[] = [];
+    const collect = (value: unknown): void => {
+      if (typeof value === "string") {
+        text.push(value);
+        return;
+      }
+      if (Array.isArray(value)) {
+        value.forEach(collect);
+        return;
+      }
+      if (!value || typeof value !== "object") return;
+      const block = value as Record<string, unknown>;
+      if (block.type === "text" && typeof block.text === "string")
+        text.push(block.text);
+      if (block.content !== undefined) collect(block.content);
+      const source = block.source;
+      if (
+        source &&
+        typeof source === "object" &&
+        "type" in source &&
+        source.type === "text" &&
+        "data" in source &&
+        typeof source.data === "string"
+      ) {
+        text.push(source.data);
+      }
+    };
+    for (const message of messages) {
+      if (message.role !== "user" || !Array.isArray(message.content)) continue;
+      for (const block of message.content) {
+        if (block.type === "tool_result") collect(block.content);
+      }
+    }
+    return text.join("\n");
+  }
+
   /** Scan input and validate budget — shared between streaming and non-streaming */
   private async scanInput(params: AnthropicCreateParams): Promise<{
     shieldInstance: AIShield;
@@ -214,7 +252,39 @@ export class ShieldedAnthropic {
     const userContent = this.extractUserContent(params.messages);
 
     // --- Scan user input ---
-    const inputResult = await shieldInstance.scan(userContent, context);
+    let inputResult = await shieldInstance.scan(userContent, context);
+
+    // Tool results are untrusted input too. Keep their wire representation
+    // intact; this is a detection gate, not a structured tool-data redactor.
+    const toolContent = this.extractToolContent(params.messages);
+    if (inputResult.decision !== "block" && toolContent) {
+      const toolResult = await shieldInstance.scan(toolContent, {
+        ...context,
+        source: "tool-output",
+      });
+      inputResult = {
+        ...inputResult,
+        safe: inputResult.safe && toolResult.safe,
+        decision:
+          toolResult.decision === "block"
+            ? "block"
+            : inputResult.decision === "warn" || toolResult.decision === "warn"
+              ? "warn"
+              : "allow",
+        violations: [...inputResult.violations, ...toolResult.violations],
+        meta: {
+          scanDurationMs:
+            inputResult.meta.scanDurationMs + toolResult.meta.scanDurationMs,
+          scannersRun: [
+            ...new Set([
+              ...inputResult.meta.scannersRun,
+              ...toolResult.meta.scannersRun,
+            ]),
+          ],
+          cached: inputResult.meta.cached && toolResult.meta.cached,
+        },
+      };
+    }
 
     if (inputResult.decision === "block") {
       this.config.onBlocked?.(inputResult, params.messages);

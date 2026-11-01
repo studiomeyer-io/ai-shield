@@ -1,6 +1,6 @@
 {
   "name": "ai-shield-gemini",
-  "version": "0.5.0",
+  "version": "0.5.2",
   "license": "MIT",
   "description": "AI Shield wrapper for Google Gemini SDK — automatic input/output scanning",
   "type": "module",
@@ -20,10 +20,13 @@
     "@google/generative-ai": ">=0.15.0"
   },
   "dependencies": {
-    "ai-shield-core": "0.5.0"
+    "ai-shield-core": "0.5.2"
   },
   "devDependencies": {
     "@google/generative-ai": "^0.24.1",
     "typescript": "^5.7.0"
-  }
+  },
+  "files": [
+    "dist"
+  ]
 }
