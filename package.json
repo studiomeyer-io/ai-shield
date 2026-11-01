@@ -51,6 +51,8 @@
     "test:openai-compat": "npm run build && node benchmarks/openai-compat.mjs",
     "test:package-exports": "npm run build && node benchmarks/package-entrypoints.mjs",
     "test:openai-peers": "npm run build && node benchmarks/openai-peers.mjs",
+    "test:anthropic-peers": "npm run build && node benchmarks/anthropic-peers.mjs",
+    "test:gemini-peers": "npm run build && node benchmarks/gemini-peers.mjs",
     "test:new-sdk-peers": "npm run build && node benchmarks/new-sdk-peers.mjs"
   },
   "devDependencies": {

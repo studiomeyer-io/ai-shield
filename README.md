@@ -18,7 +18,7 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 [![TypeScript](https://img.shields.io/badge/TypeScript-strict-blue.svg)](tsconfig.json)
 [![Zero Dependencies](https://img.shields.io/badge/dependencies-0-brightgreen.svg)](package.json)
-[![Tests: 871 passing](https://img.shields.io/badge/tests-871%20passing-brightgreen.svg)](tests/)
+[![Tests: 872 passing](https://img.shields.io/badge/tests-872%20passing-brightgreen.svg)](tests/)
 
 Prompt injection detection (incl. unicode-tag / leetspeak / typoglycemia / letter-splitting / multilingual evasion) · Indirect-injection (RAG / tool-desc / tool-output / memory / web) · Output scanning (SQL / shell / XSS / secret leak) · PII protection · Trust-tier context streams · Multi-agent trust propagation · Dual-LLM privilege separation · Memory poisoning detection · Tool policy enforcement · Circuit breakers · Async LLM-judge · Cost tracking · Audit logging
 
@@ -142,6 +142,7 @@ User Input → [AI Shield Scanner Chain] → LLM Provider
 | Package | Description |
 |---------|-------------|
 | `ai-shield-core` | Scanner chain, PII, injection detection, tool policy, cost tracking, audit |
+| `ai-shield-classifier-onnx` | Optional ONNX classifier adapter |
 | `ai-shield-openai` | Drop-in wrapper for OpenAI SDK |
 | `ai-shield-anthropic` | Drop-in wrapper for Anthropic SDK |
 | `ai-shield-gemini` | Drop-in wrapper for Google Gemini SDK (deprecated `@google/generative-ai`) |
@@ -324,7 +325,7 @@ console.log(stream.shieldResult);  // { input, output }
 
 ### Level 2f: Vercel AI SDK (middleware)
 
-Source workspace only: `ai-shield-ai-sdk` has not been published to npm; the current local release candidate is 0.5.2. Clone this repository, run `npm ci` and `npm run build` at the root, then use its local workspace package. The import below assumes that workspace setup.
+Source workspace only: `ai-shield-ai-sdk` has not been published to npm. These examples use the 0.5.2 workspace. Clone this repository, run `npm ci` and `npm run build` at the root, then use the local package.
 
 Requires Node.js 22 or newer, matching the AI 7/provider 4 engine floor. The adapter declares @types/json-schema for its public provider declarations; consumers do not need a manual type-dependency repair. Works with AI SDK providers via `wrapLanguageModel` (`ai` >= 7, <8). The input
 scan runs in `transformParams` BEFORE the provider is called — a `block`
@@ -361,12 +362,12 @@ const model = shieldModel(openai("gpt-4o"), { outputScan: true });
 
 ### Level 2g: Google Gen AI Wrapper (new `@google/genai` SDK)
 
-Source workspace only: `ai-shield-google-genai` has not been published to npm; the current local release candidate is 0.5.2. Build the repository workspaces with `npm ci` and `npm run build`; the import below assumes that local workspace setup.
+Source workspace only: `ai-shield-google-genai` has not been published to npm. These examples use the 0.5.2 workspace, built with `npm ci` and `npm run build` at the repository root.
 
 For the new unified Google Gen AI SDK (`@google/genai` — Gemini Developer API
 and Vertex AI, supersedes the deprecated `@google/generative-ai` covered by
 Level 2d/2e). Same call shape as the raw client — the model is passed per
-call, and `response.text` is an accessor property in this SDK:
+call, and `response.text` is an accessor property in this SDK. The adapter declares `@modelcontextprotocol/sdk ^1.32.2` because the Google SDK public types import it even though upstream marks it optional; a fresh consumer receives those declarations automatically:
 
 ```ts
 import { GoogleGenAI } from "@google/genai";
@@ -1222,7 +1223,7 @@ ai-shield/
 │           ├── express.ts     Express middleware
 │           └── hono.ts        Hono middleware
 │
-├── tests/                     50 files · 871 cases (vitest)
+├── tests/                     50 files · 872 cases (vitest)
 │   ├── unit/                  scanners, policy, cost, wrappers, middleware
 │   ├── integration/           defense-in-depth + full-pipeline
 │   └── corpus/                labelled attack / benign regression harness
@@ -1237,19 +1238,32 @@ ai-shield/
 ## Tests
 
 ```bash
-npm test               # 871 tests / 50 files; full suite also rerun on Node 20 in R3
-npm run bench:redos    # repeated-trigger growth regression, not a latency SLA
-npm run bench:coverage # labeled limitation probes, includes misses and false positives
-npm run test:package-exports # inspect declared entrypoints in all eight npm tarballs
-npm run test:openai-compat   # real development SDK client type/runtime compatibility
-npm run test:openai-peers    # packed consumers, including the declared SDK 4.0.0 floor
-npm run test:new-sdk-peers   # new SDK packed consumers on Node 22
-npm run test:new-sdk-peers -- google-genai # GenAI-only gate also runs on Node 20
+npm test                       # 872 tests / 50 files in the Node 22 full suite
+npm run bench:redos             # repeated-trigger growth regression
+npm run bench:coverage          # labeled limitation probes
+npm run test:package-exports    # all eight packed entrypoints
+npm run test:openai-peers        # includes the declared SDK 4.0.0 floor
+npm run test:anthropic-peers     # actual Anthropic clients and JSON/SSE
+npm run test:gemini-peers        # actual legacy Gemini clients and JSON/SSE
+npm run test:new-sdk-peers       # AI SDK and Google Gen AI on Node 22
+npm run test:new-sdk-peers -- google-genai # GenAI-only gate on Node 20
 ```
 
-The checked dependency update reduced the root development-tree audit from 15 findings to zero; the production audit remained zero. Four wrapper tarballs previously omitted declared dist entrypoints. Explicit distribution-file inventories repair OpenAI, Anthropic, legacy Gemini and middleware packages; the packaging gate checks all eight workspaces. Packed consumers using OpenAI SDK 4.104.0 and 6.49.0 passed strict TypeScript and real nonstreaming/SSE SDK calls against a local fetch stub on Node 20 and 22. These are compatibility checks, not a security endorsement of the old SDK4/Zod3 fixture. The OpenAI peer remains >=4.0.0; the packed-peer gate checks that exact floor with strict TypeScript and skipLibCheck:false, plus real streaming/nonstreaming calls. Existing published wrappers keep their engines/peers. The unpublished AI SDK adapter alone now declares Node>=22. No new package version has been published.
+Version 0.5.2 passed 24 local release checks, including the 872-test Node 22 full suite and 804 tests across 48 files in the supported Node 20 scope. Two files importing AI7 are excluded from that Node 20 scope; the AI SDK adapter requires Node 22. All eight exact package archives pass entrypoint, strict-type and local runtime checks and contain the complete root MIT license. Root and fresh combined-consumer audits report zero findings. ONNX was exercised with its injected session/tokenizer; native inference was outside these checks.
 
-Candidate 0.5.2 has independent R3 acceptance. The release builder passed 19 local checks; the reviewer independently reran all 871 tests on Node 20 and verified fresh packed consumers. Real Google Gen AI 2.0.0/2.32.0 JSON/SSE paths pass on Node 20 and 22. AI SDK 7.0.0/7.0.159 uses its declared Node 22 floor and actual generateText/streamText paths. Consumers compile with strict:true and skipLibCheck:false. All eight archives contain the exact root MIT license and declared entrypoints; independently packed bytes and SHA256SUMS agree. These artifacts remain unpublished.
+The isolated packed-consumer matrix contains 22 SDK/version/Node cases with strict:true and skipLibCheck:false:
+
+| SDK | Versions checked | Node versions |
+|---|---|---|
+| OpenAI | 4.0.0, 4.104.0, 6.49.0 | 20, 22 |
+| Anthropic | 0.30.0, 0.135.0, 0.137.0 | 20, 22 |
+| Legacy Gemini | 0.15.0, 0.24.1 | 20, 22 |
+| Google Gen AI | 2.0.0, 2.32.0 | 20, 22 |
+| AI SDK | 7.0.0, 7.0.159 | 22 |
+
+These checks use real SDK constructors, native request types and JSON/SSE paths with local fetch stubs or the official AI test provider. Tool-result rejection happens before the provider call. Anthropic toolsets without a name remain intact in the forwarded payload and are omitted only from the named-tool scan context. Legacy Gemini's compatibility fix changes declarations while leaving its generated runtime JavaScript unchanged. The table records finite tested versions; it does not certify every version admitted by a peer range. Existing external peers/engines remain unchanged, including the AI adapter's Node 22 floor.
+
+Separate real HTTP application checks pass 12 framework/Node cases and 36 short benign requests: Express 4.0.0/4.22.3/5.0.0/5.3.0 and Hono 4.0.0/4.13.16 on Node 20/22. Strict typing passes for those Express versions and Hono 4.13.16. Hono 4.0.0 has the same duplicate render declaration under TypeScript 5.9.3 with strict:true and skipLibCheck:false in a minimal upstream-only app; no Hono 4.0 strict-clean claim or peer-floor increase follows. Middleware attaches its sanitized result; it preserves the original body, so applications must use that result when redaction is needed.
 
 The existing attack corpus has 24 attack and 17 benign cases. It is a repository regression self-check, not an independent benchmark. The separate coverage command checks 12 attack and 12 benign limitation probes per setting. In the checked default run it blocked 5/12 attacks and 2/12 benign cases. High strictness blocked 5/12 attacks, flagged one more as a warning and still blocked 2/12 benign cases. These results expose known gaps; they do not estimate general detection or false-positive rates.
 
@@ -1272,6 +1286,8 @@ Minimal by design. Core has zero runtime dependencies. Optional peer deps for Re
 | `@google/generative-ai` | Peer dep of `ai-shield-gemini` | Gemini SDK wrapper (deprecated SDK) |
 | `@google/genai` (>= 2) | Peer dep of `ai-shield-google-genai` | Google Gen AI SDK wrapper (new unified SDK) |
 | `ai` (>= 7) | Peer dep of `ai-shield-ai-sdk` | Vercel AI SDK middleware |
+| `@types/json-schema` | Dependency of `ai-shield-ai-sdk` | Public provider declarations |
+| `@modelcontextprotocol/sdk` (^1.32.2) | Dependency of `ai-shield-google-genai` | Types imported by the Google SDK |
 | `express` | Peer dep of `ai-shield-middleware` | Express middleware |
 | `hono` | Peer dep of `ai-shield-middleware` | Hono middleware |
 

@@ -2,7 +2,7 @@
   "name": "ai-shield-google-genai",
   "version": "0.5.2",
   "license": "MIT",
-  "description": "AI Shield wrapper for the Google Gen AI SDK (@google/genai) — automatic input/output scanning",
+  "description": "AI Shield wrapper for the Google Gen AI SDK (@google/genai) \u2014 automatic input/output scanning",
   "author": "StudioMeyer <hello@studiomeyer.io>",
   "repository": {
     "type": "git",
@@ -44,10 +44,11 @@
     "@google/genai": ">=2.0.0 <3.0.0"
   },
   "dependencies": {
-    "ai-shield-core": "0.5.2"
+    "ai-shield-core": "0.5.2",
+    "@modelcontextprotocol/sdk": "^1.32.2"
   },
   "devDependencies": {
-    "@google/genai": "^2.30.0",
+    "@google/genai": "^2.31.0",
     "typescript": "^5.7.0"
   },
   "engines": {

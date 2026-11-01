@@ -60,26 +60,32 @@ interface ContentBlockToolUse {
 type ContentBlock =
   | ContentBlockText
   | ContentBlockToolUse
+  | { type: string; content?: unknown; text?: string }
   | { type: string; [key: string]: unknown };
 
 export interface AnthropicMessage {
-  role: "user" | "assistant";
+  role: "user" | "assistant" | "system";
   content: string | ContentBlock[];
 }
 
 interface AnthropicTool {
-  name: string;
+  name?: string;
+  type?: string | null;
   description?: string;
-  input_schema: Record<string, unknown>;
+  input_schema?: Record<string, unknown>;
 }
 
-export interface AnthropicCreateParams {
+// Only fields inspected by the wrapper constrain SDK request variables.
+interface AnthropicInputParams {
   model: string;
   messages: AnthropicMessage[];
   system?: string | Array<{ type: "text"; text: string }>;
   max_tokens: number;
   tools?: AnthropicTool[];
   stream?: boolean;
+}
+
+export interface AnthropicCreateParams extends AnthropicInputParams {
   [key: string]: unknown;
 }
 
@@ -100,14 +106,14 @@ export interface AnthropicStreamEvent {
   message?: AnthropicResponse;
   index?: number;
   content_block?: ContentBlock;
-  delta?: { type: string; text?: string; stop_reason?: string };
+  delta?: { type?: string; text?: string; stop_reason?: string | null };
   usage?: { output_tokens: number };
 }
 
 interface AnthropicLike {
   messages: {
     create(
-      params: AnthropicCreateParams,
+      params: AnthropicInputParams,
     ): Promise<AnthropicResponse | AsyncIterable<AnthropicStreamEvent>>;
   };
 }
@@ -143,7 +149,7 @@ export class ShieldedAnthropic {
   }
 
   /** Build scan context from params */
-  private buildContext(params: AnthropicCreateParams): ScanContext {
+  private buildContext(params: AnthropicInputParams): ScanContext {
     if (this.config.contextFactory) {
       return this.config.contextFactory(params.messages);
     }
@@ -155,7 +161,9 @@ export class ShieldedAnthropic {
 
     // Include tool names if tools are declared
     if (params.tools) {
-      context.tools = params.tools.map((t) => ({ name: t.name }));
+      context.tools = params.tools.flatMap((tool) =>
+        tool.name ? [{ name: tool.name }] : [],
+      );
     }
 
     return context;
@@ -240,12 +248,12 @@ export class ShieldedAnthropic {
   }
 
   /** Scan input and validate budget — shared between streaming and non-streaming */
-  private async scanInput(params: AnthropicCreateParams): Promise<{
+  private async scanInput(params: AnthropicInputParams): Promise<{
     shieldInstance: AIShield;
     context: ScanContext;
     userContent: string;
     inputResult: ScanResult;
-    finalParams: AnthropicCreateParams;
+    finalParams: AnthropicInputParams;
   }> {
     const shieldInstance = await this.getShield();
     const context = this.buildContext(params);
@@ -334,7 +342,9 @@ export class ShieldedAnthropic {
   }
 
   /** Create message with Shield protection (non-streaming) */
-  async createMessage(params: AnthropicCreateParams): Promise<
+  async createMessage<Params extends AnthropicInputParams>(
+    params: Params,
+  ): Promise<
     AnthropicResponse & {
       _shield?: {
         input: ScanResult;
@@ -377,11 +387,11 @@ export class ShieldedAnthropic {
   }
 
   /** Create streaming message with Shield protection */
-  async createMessageStream(
-    params: Omit<AnthropicCreateParams, "stream">,
+  async createMessageStream<Params extends AnthropicInputParams>(
+    params: Params,
   ): Promise<ShieldedAnthropicStream> {
     const { shieldInstance, context, inputResult, finalParams } =
-      await this.scanInput(params as AnthropicCreateParams);
+      await this.scanInput(params);
 
     // --- Make streaming API call ---
     const stream = (await this.client.messages.create({
@@ -403,9 +413,9 @@ export class ShieldedAnthropic {
 
   /** Replace user content with sanitized version */
   private replaceUserContent(
-    params: AnthropicCreateParams,
+    params: AnthropicInputParams,
     sanitized: string,
-  ): AnthropicCreateParams {
+  ): AnthropicInputParams {
     const messages = params.messages.map((msg) => {
       if (msg.role !== "user") return msg;
 

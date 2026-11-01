@@ -5,9 +5,7 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
-
-Local release candidate: **0.5.2**, independently accepted in R3. All eight prepared archives remain unpublished; no release publication is implied by this acceptance.
+## [0.5.2] - 2026-11-01
 
 ### Security
 
@@ -20,20 +18,22 @@ Local release candidate: **0.5.2**, independently accepted in R3. All eight prep
 
 - Include declared dist JavaScript/type entrypoints in the OpenAI, Anthropic, legacy Gemini and middleware tarballs. Add test:package-exports over all eight workspace tarballs and wire it into CI.
 - Fix OpenAI wrapper declarations for real SDK4/6 constructor/request types without changing its public peer range. Packed consumers compile in strict TypeScript and exercise actual nonstreaming/SSE SDK paths through a local fetch stub on Node 20/22; add the development-client test:openai-compat CI gate.
-- Refresh the development tree to remove all 15 measured audit findings; production remains at zero. The root development SDK update does not widen or narrow published consumer support. Release metadata is prepared at 0.5.2; no package publication is included.
+- Refresh the development tree to remove all 15 measured audit findings; production remains at zero. The root development SDK update does not widen or narrow published consumer support.
 
-### Release-candidate consumer checks
+### SDK compatibility and package checks
 
-- Add test:openai-peers using packed consumers, including the declared OpenAI 4.0.0 floor, strict TypeScript with skipLibCheck:false and actual streaming/nonstreaming SDK calls. Preserve the published OpenAI peer/engine contract.
-- Give the unpublished ai-shield-ai-sdk adapter an honest Node>=22 floor for AI 7/provider 4, and declare @types/json-schema for its public declarations. Existing published wrappers retain their engine/peer metadata.
-- Add test:new-sdk-peers for actual AI SDK 7.0.0/7.0.159 and Google Gen AI 2.0.0/2.32.0 consumers. The release builder passes 19 checks. Independent R3 review passes the full 871-test Node 20 suite and strict fresh consumers. Google Gen AI JSON/SSE paths run on Node 20/22; AI7 retains its Node 22 engine requirement. CI runs the complete new peer gate on Node 22 and the GenAI-only gate on Node 20.
+- Check exact packed SDK consumers with strict:true and skipLibCheck:false: OpenAI 4.0.0/4.104.0/6.49.0, Anthropic 0.30.0/0.135.0/0.137.0, legacy Gemini 0.15.0/0.24.1 and Google Gen AI 2.0.0/2.32.0 on Node 20/22; AI 7.0.0/7.0.159 on Node 22. The matrix contains 22 isolated cases, without broadening external peer or engine contracts.
+- Fix Anthropic constructor/request/stream declarations. Exclude nameless SDK toolsets only from named-tool scan context while forwarding the complete provider payload. Legacy Gemini fixes are type-only; generated JavaScript remains identical.
+- Declare @modelcontextprotocol/sdk ^1.32.2 in the Google Gen AI adapter because upstream public declarations import that optional peer unconditionally. Fresh consumers receive the required types without a manual dependency repair.
+- Set the AI SDK adapter's Node>=22 floor to match AI 7/provider 4 and declare @types/json-schema for its public provider types. Existing published wrappers keep their engines/peers.
+- Include the exact complete root MIT LICENSE and all declared entrypoints in eight 0.5.2 tarballs. Package/type/runtime and checksum checks cover those exact archives. ONNX checks use an injected session/tokenizer; native inference is outside their scope.
+- Fully incorporate the four dependency-update intents from #47: root typescript-eslint and the AI, Anthropic and Google Gen AI development dependencies.
 
-- Include the exact root MIT LICENSE in all eight 0.5.2 archives. Independent tarball entrypoint/type/runtime checks and SHA256SUMS verification pass; these checks do not publish packages.
+### Validation and documentation
 
-### Documentation
-
-- Replace universal latency, ReDoS and detection/false-positive claims with reproducible growth and coverage commands and their measured limits. The original corpus is a regression self-check.
-- Identify the AI SDK and unified Google Gen AI packages as source workspaces pending first npm publication.
+- Record 24 local release checks, 872 full-suite tests on Node 22 and 804 tests in the supported Node 20 scope. Root and fresh combined-consumer audits report zero findings.
+- Exercise actual Express/Hono apps in 12 framework/Node cases and 36 benign requests. Express 4.0.0/4.22.3/5.0.0/5.3.0 and Hono 4.13.16 pass strict typing. Hono 4.0.0 runtime passes, while its TypeScript 5.9.3 duplicate-render failure reproduces without Shield; its peer floor remains unchanged.
+- Keep detector coverage/growth probes separate from general performance or detection guarantees. Middleware attaches sanitized results without automatically rewriting request bodies.
 
 ### Added
 
@@ -51,7 +51,7 @@ Local release candidate: **0.5.2**, independently accepted in R3. All eight prep
   the `finish` stream part (output findings are reported, not blocked — same
   semantics as the other streaming wrappers). Ships a `shieldModel(model,
   config)` convenience factory. `ai` is a peer dependency (`>=7.0.0 <8.0.0`),
-  runtime deps are `ai-shield-core` only, and core itself is untouched.
+  adapter dependencies include `ai-shield-core` and `@types/json-schema` for public provider declarations.
   19 new unit tests (`tests/unit/ai-sdk-middleware.test.ts`) drive the real
   `wrapLanguageModel` + `generateText` + `streamText` pipeline against the
   official `ai/test` mock model (block, allow, PII-mask, multi-message mask,
@@ -81,12 +81,10 @@ Local release candidate: **0.5.2**, independently accepted in R3. All eight prep
   captured from the final chunk — no aggregated `response` promise), and
   budget checks / cost records use the per-call `params.model` (no
   `modelName` config needed). Tool names for policy context are read from
-  `config.tools[].functionDeclarations`. Duck-typed like the other wrappers
-  (zero hard SDK dependency) with a compile-time compatibility proof
+  `config.tools[].functionDeclarations`. Public input types preserve SDK-native request forms, with a compile-time compatibility proof
   (`src/compat-check.ts`) asserting the duck types against the real
   `@google/genai` declarations at `tsc -b` time. `@google/genai` is a peer
-  dependency (`>=2.0.0 <3.0.0`), runtime deps are `ai-shield-core` only, and
-  core itself is untouched. 27 new unit tests
+  dependency (`>=2.0.0 <3.0.0`), the adapter declares `ai-shield-core` and `@modelcontextprotocol/sdk ^1.32.2` to supply public declaration dependencies. 27 new unit tests
   (`tests/unit/google-genai-wrapper.test.ts` +
   `tests/unit/google-genai-stream.test.ts`) mirror the gemini mock-client
   style against the new surface (block + model-never-called, allow, contents

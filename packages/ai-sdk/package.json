@@ -48,7 +48,7 @@
     "@types/json-schema": "^7.0.15"
   },
   "devDependencies": {
-    "ai": "^7.0.143",
+    "ai": "^7.0.150",
     "typescript": "^5.7.0"
   },
   "engines": {

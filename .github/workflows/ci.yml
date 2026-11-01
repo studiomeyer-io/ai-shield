@@ -67,6 +67,12 @@ jobs:
       - name: OpenAI declared peer contract
         run: npm run test:openai-peers
 
+      - name: Anthropic declared peer contract
+        run: npm run test:anthropic-peers
+
+      - name: Legacy Gemini declared peer contract
+        run: npm run test:gemini-peers
+
       - name: New adapter SDK peer contracts
         if: matrix.node-version == 22
         run: npm run test:new-sdk-peers
