@@ -41,25 +41,46 @@ export interface ShieldedOpenAIConfig {
   onWarning?: (result: ScanResult, messages: ChatMessage[]) => void;
 }
 
+// Public shapes are structural: the declared peer floor predates SDK
+// tool-call type names. Full calls and partial stream deltas stay distinct.
+type ChatToolCall =
+  | {
+      id?: string;
+      type?: "function";
+      function: { name: string; arguments: string };
+    }
+  | {
+      id?: string;
+      type: "custom";
+      custom: { name: string; input: string };
+    };
+
+interface ChatToolCallDelta {
+  index?: number;
+  id?: string;
+  type?: "function" | "custom";
+  function?: { name?: string; arguments?: string };
+  custom?: { name?: string; input?: string };
+}
+
 interface ChatMessage {
   role: string;
-  content: string | null | Array<{ type: string; text?: string }>;
-  tool_calls?: Array<{ function: { name: string; arguments: string } }>;
+  content?: string | null | Array<{ type: string; text?: string }>;
+  tool_calls?: ChatToolCall[];
 }
 
 interface ChatCompletionParams {
   model: string;
   messages: ChatMessage[];
-  tools?: Array<{ function: { name: string } }>;
-  stream?: boolean;
-  [key: string]: unknown;
+  tools?: Array<{ function?: { name: string }; custom?: { name: string } }>;
+  stream?: boolean | null;
 }
 
 interface ChatCompletion {
   choices: Array<{
     message: {
       content: string | null;
-      tool_calls?: Array<{ function: { name: string; arguments: string } }>;
+      tool_calls?: ChatToolCall[];
     };
   }>;
   usage?: {
@@ -74,7 +95,7 @@ export interface ChatCompletionChunk {
     delta: {
       content?: string | null;
       role?: string;
-      tool_calls?: Array<{ function: { name: string; arguments: string } }>;
+      tool_calls?: ChatToolCallDelta[];
     };
     index: number;
     finish_reason: string | null;
@@ -90,7 +111,9 @@ interface OpenAILike {
   chat: {
     completions: {
       create(
-        params: ChatCompletionParams,
+        params: Pick<ChatCompletionParams, "model" | "messages" | "tools"> & {
+          stream?: boolean | null;
+        },
       ): Promise<ChatCompletion | AsyncIterable<ChatCompletionChunk>>;
     };
   };
@@ -139,7 +162,10 @@ export class ShieldedOpenAI {
 
     // Include tool names if tools are being called
     if (params.tools) {
-      context.tools = params.tools.map((t) => ({ name: t.function.name }));
+      context.tools = params.tools.flatMap((tool) => {
+        const name = tool.function?.name ?? tool.custom?.name;
+        return name ? [{ name }] : [];
+      });
     }
 
     return context;
@@ -167,6 +193,15 @@ export class ShieldedOpenAI {
     return parts.join("\n");
   }
 
+  /** Extract runtime tool/function results, including legacy function messages. */
+  private extractToolContent(messages: ChatMessage[]): string {
+    return this.extractUserContent(
+      messages
+        .filter((msg) => msg.role === "tool" || msg.role === "function")
+        .map((msg) => ({ ...msg, role: "user" })),
+    );
+  }
+
   /** Scan input and validate budget — shared between streaming and non-streaming */
   private async scanInput(params: ChatCompletionParams): Promise<{
     shieldInstance: AIShield;
@@ -180,7 +215,39 @@ export class ShieldedOpenAI {
     const userContent = this.extractUserContent(params.messages);
 
     // --- Scan input ---
-    const inputResult = await shieldInstance.scan(userContent, context);
+    let inputResult = await shieldInstance.scan(userContent, context);
+
+    // Tool results are untrusted input too. Keep their wire representation
+    // intact; this is a detection gate, not a structured tool-data redactor.
+    const toolContent = this.extractToolContent(params.messages);
+    if (inputResult.decision !== "block" && toolContent) {
+      const toolResult = await shieldInstance.scan(toolContent, {
+        ...context,
+        source: "tool-output",
+      });
+      inputResult = {
+        ...inputResult,
+        safe: inputResult.safe && toolResult.safe,
+        decision:
+          toolResult.decision === "block"
+            ? "block"
+            : inputResult.decision === "warn" || toolResult.decision === "warn"
+              ? "warn"
+              : "allow",
+        violations: [...inputResult.violations, ...toolResult.violations],
+        meta: {
+          scanDurationMs:
+            inputResult.meta.scanDurationMs + toolResult.meta.scanDurationMs,
+          scannersRun: [
+            ...new Set([
+              ...inputResult.meta.scannersRun,
+              ...toolResult.meta.scannersRun,
+            ]),
+          ],
+          cached: inputResult.meta.cached && toolResult.meta.cached,
+        },
+      };
+    }
 
     if (inputResult.decision === "block") {
       this.config.onBlocked?.(inputResult, params.messages);
@@ -227,7 +294,9 @@ export class ShieldedOpenAI {
   }
 
   /** Create chat completion with Shield protection (non-streaming) */
-  async createChatCompletion(params: ChatCompletionParams): Promise<
+  async createChatCompletion<Params extends ChatCompletionParams>(
+    params: Params,
+  ): Promise<
     ChatCompletion & {
       _shield?: {
         input: ScanResult;
@@ -270,11 +339,11 @@ export class ShieldedOpenAI {
   }
 
   /** Create streaming chat completion with Shield protection */
-  async createChatCompletionStream(
-    params: Omit<ChatCompletionParams, "stream">,
-  ): Promise<ShieldedChatStream> {
+  async createChatCompletionStream<
+    Params extends Omit<ChatCompletionParams, "stream">,
+  >(params: Params): Promise<ShieldedChatStream> {
     const { shieldInstance, context, inputResult, finalParams } =
-      await this.scanInput(params as ChatCompletionParams);
+      await this.scanInput(params);
 
     // --- Make streaming API call ---
     const stream = (await this.client.chat.completions.create({

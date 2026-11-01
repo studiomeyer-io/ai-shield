@@ -43,6 +43,19 @@ describe("Middleware Shared", () => {
       expect(defaultGetInput(body)).toBe("What is AI?\nTell me more.");
     });
 
+    it("includes tool and legacy function messages and multipart text", () => {
+      expect(
+        defaultGetInput({
+          messages: [
+            { role: "user", content: "question" },
+            { role: "tool", content: [{ type: "text", text: "tool result" }] },
+            { role: "function", content: "function result" },
+            null,
+          ],
+        }),
+      ).toBe("question\ntool result\nfunction result");
+    });
+
     it("returns null for empty body", () => {
       expect(defaultGetInput(null)).toBeNull();
       expect(defaultGetInput(undefined)).toBeNull();

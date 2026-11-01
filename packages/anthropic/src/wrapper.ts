@@ -60,26 +60,32 @@ interface ContentBlockToolUse {
 type ContentBlock =
   | ContentBlockText
   | ContentBlockToolUse
+  | { type: string; content?: unknown; text?: string }
   | { type: string; [key: string]: unknown };
 
 export interface AnthropicMessage {
-  role: "user" | "assistant";
+  role: "user" | "assistant" | "system";
   content: string | ContentBlock[];
 }
 
 interface AnthropicTool {
-  name: string;
+  name?: string;
+  type?: string | null;
   description?: string;
-  input_schema: Record<string, unknown>;
+  input_schema?: Record<string, unknown>;
 }
 
-export interface AnthropicCreateParams {
+// Only fields inspected by the wrapper constrain SDK request variables.
+interface AnthropicInputParams {
   model: string;
   messages: AnthropicMessage[];
   system?: string | Array<{ type: "text"; text: string }>;
   max_tokens: number;
   tools?: AnthropicTool[];
   stream?: boolean;
+}
+
+export interface AnthropicCreateParams extends AnthropicInputParams {
   [key: string]: unknown;
 }
 
@@ -100,14 +106,14 @@ export interface AnthropicStreamEvent {
   message?: AnthropicResponse;
   index?: number;
   content_block?: ContentBlock;
-  delta?: { type: string; text?: string; stop_reason?: string };
+  delta?: { type?: string; text?: string; stop_reason?: string | null };
   usage?: { output_tokens: number };
 }
 
 interface AnthropicLike {
   messages: {
     create(
-      params: AnthropicCreateParams,
+      params: AnthropicInputParams,
     ): Promise<AnthropicResponse | AsyncIterable<AnthropicStreamEvent>>;
   };
 }
@@ -143,7 +149,7 @@ export class ShieldedAnthropic {
   }
 
   /** Build scan context from params */
-  private buildContext(params: AnthropicCreateParams): ScanContext {
+  private buildContext(params: AnthropicInputParams): ScanContext {
     if (this.config.contextFactory) {
       return this.config.contextFactory(params.messages);
     }
@@ -155,7 +161,9 @@ export class ShieldedAnthropic {
 
     // Include tool names if tools are declared
     if (params.tools) {
-      context.tools = params.tools.map((t) => ({ name: t.name }));
+      context.tools = params.tools.flatMap((tool) =>
+        tool.name ? [{ name: tool.name }] : [],
+      );
     }
 
     return context;
@@ -201,20 +209,90 @@ export class ShieldedAnthropic {
     return mod.scanOutput(text, cfg, context);
   }
 
+  /** Extract textual content from tool results, excluding binary image data. */
+  private extractToolContent(messages: AnthropicMessage[]): string {
+    const text: string[] = [];
+    const collect = (value: unknown): void => {
+      if (typeof value === "string") {
+        text.push(value);
+        return;
+      }
+      if (Array.isArray(value)) {
+        value.forEach(collect);
+        return;
+      }
+      if (!value || typeof value !== "object") return;
+      const block = value as Record<string, unknown>;
+      if (block.type === "text" && typeof block.text === "string")
+        text.push(block.text);
+      if (block.content !== undefined) collect(block.content);
+      const source = block.source;
+      if (
+        source &&
+        typeof source === "object" &&
+        "type" in source &&
+        source.type === "text" &&
+        "data" in source &&
+        typeof source.data === "string"
+      ) {
+        text.push(source.data);
+      }
+    };
+    for (const message of messages) {
+      if (message.role !== "user" || !Array.isArray(message.content)) continue;
+      for (const block of message.content) {
+        if (block.type === "tool_result") collect(block.content);
+      }
+    }
+    return text.join("\n");
+  }
+
   /** Scan input and validate budget — shared between streaming and non-streaming */
-  private async scanInput(params: AnthropicCreateParams): Promise<{
+  private async scanInput(params: AnthropicInputParams): Promise<{
     shieldInstance: AIShield;
     context: ScanContext;
     userContent: string;
     inputResult: ScanResult;
-    finalParams: AnthropicCreateParams;
+    finalParams: AnthropicInputParams;
   }> {
     const shieldInstance = await this.getShield();
     const context = this.buildContext(params);
     const userContent = this.extractUserContent(params.messages);
 
     // --- Scan user input ---
-    const inputResult = await shieldInstance.scan(userContent, context);
+    let inputResult = await shieldInstance.scan(userContent, context);
+
+    // Tool results are untrusted input too. Keep their wire representation
+    // intact; this is a detection gate, not a structured tool-data redactor.
+    const toolContent = this.extractToolContent(params.messages);
+    if (inputResult.decision !== "block" && toolContent) {
+      const toolResult = await shieldInstance.scan(toolContent, {
+        ...context,
+        source: "tool-output",
+      });
+      inputResult = {
+        ...inputResult,
+        safe: inputResult.safe && toolResult.safe,
+        decision:
+          toolResult.decision === "block"
+            ? "block"
+            : inputResult.decision === "warn" || toolResult.decision === "warn"
+              ? "warn"
+              : "allow",
+        violations: [...inputResult.violations, ...toolResult.violations],
+        meta: {
+          scanDurationMs:
+            inputResult.meta.scanDurationMs + toolResult.meta.scanDurationMs,
+          scannersRun: [
+            ...new Set([
+              ...inputResult.meta.scannersRun,
+              ...toolResult.meta.scannersRun,
+            ]),
+          ],
+          cached: inputResult.meta.cached && toolResult.meta.cached,
+        },
+      };
+    }
 
     if (inputResult.decision === "block") {
       this.config.onBlocked?.(inputResult, params.messages);
@@ -264,7 +342,9 @@ export class ShieldedAnthropic {
   }
 
   /** Create message with Shield protection (non-streaming) */
-  async createMessage(params: AnthropicCreateParams): Promise<
+  async createMessage<Params extends AnthropicInputParams>(
+    params: Params,
+  ): Promise<
     AnthropicResponse & {
       _shield?: {
         input: ScanResult;
@@ -307,11 +387,11 @@ export class ShieldedAnthropic {
   }
 
   /** Create streaming message with Shield protection */
-  async createMessageStream(
-    params: Omit<AnthropicCreateParams, "stream">,
+  async createMessageStream<Params extends AnthropicInputParams>(
+    params: Params,
   ): Promise<ShieldedAnthropicStream> {
     const { shieldInstance, context, inputResult, finalParams } =
-      await this.scanInput(params as AnthropicCreateParams);
+      await this.scanInput(params);
 
     // --- Make streaming API call ---
     const stream = (await this.client.messages.create({
@@ -333,9 +413,9 @@ export class ShieldedAnthropic {
 
   /** Replace user content with sanitized version */
   private replaceUserContent(
-    params: AnthropicCreateParams,
+    params: AnthropicInputParams,
     sanitized: string,
-  ): AnthropicCreateParams {
+  ): AnthropicInputParams {
     const messages = params.messages.map((msg) => {
       if (msg.role !== "user") return msg;
 

@@ -1,8 +1,9 @@
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, vi } from "vitest";
 import { AIShield } from "../../packages/core/src/index.js";
 import {
   ShieldedAnthropic,
   ShieldBlockError,
+  type AnthropicCreateParams,
 } from "../../packages/anthropic/src/wrapper.js";
 
 // --- Mock Anthropic client ---
@@ -22,6 +23,36 @@ function mockAnthropic(content?: string) {
 }
 
 describe("ShieldedAnthropic", () => {
+  it("preserves unnamed SDK toolsets and request metadata", async () => {
+    const shield = new AIShield({
+      audit: { enabled: false },
+      pii: { enabled: false },
+    });
+    const scan = vi.spyOn(shield, "scan");
+    const create = vi.fn(mockAnthropic().messages.create);
+    const wrapper = new ShieldedAnthropic(
+      { messages: { create } },
+      { shieldInstance: shield },
+    );
+    const params: AnthropicCreateParams = {
+      model: "local-test-model",
+      max_tokens: 16,
+      messages: [{ role: "user", content: "What is the weather?" }],
+      metadata: { user_id: "local-test-user" },
+      tools: [
+        { name: "lookup", input_schema: { type: "object" } },
+        { type: "browser_toolset_20260801" },
+      ],
+    };
+    await wrapper.createMessage(params);
+    expect(scan).toHaveBeenCalledWith(
+      "What is the weather?",
+      expect.objectContaining({ tools: [{ name: "lookup" }] }),
+    );
+    expect(create.mock.calls[0]?.[0]).toEqual({ ...params, stream: false });
+    await wrapper.close();
+  });
+
   describe("clean input", () => {
     it("passes clean input through", async () => {
       const client = mockAnthropic();

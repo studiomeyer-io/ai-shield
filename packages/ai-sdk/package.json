@@ -1,6 +1,6 @@
 {
   "name": "ai-shield-ai-sdk",
-  "version": "0.5.0",
+  "version": "0.5.2",
   "license": "MIT",
   "description": "AI Shield middleware for the Vercel AI SDK — input/output scanning via wrapLanguageModel",
   "author": "StudioMeyer <hello@studiomeyer.io>",
@@ -44,13 +44,14 @@
     "ai": ">=7.0.0 <8.0.0"
   },
   "dependencies": {
-    "ai-shield-core": "0.5.0"
+    "ai-shield-core": "0.5.2",
+    "@types/json-schema": "^7.0.15"
   },
   "devDependencies": {
-    "ai": "^7.0.143",
+    "ai": "^7.0.150",
     "typescript": "^5.7.0"
   },
   "engines": {
-    "node": ">=20.0.0"
+    "node": ">=22.0.0"
   }
 }

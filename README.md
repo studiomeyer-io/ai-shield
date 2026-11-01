@@ -18,7 +18,7 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 [![TypeScript](https://img.shields.io/badge/TypeScript-strict-blue.svg)](tsconfig.json)
 [![Zero Dependencies](https://img.shields.io/badge/dependencies-0-brightgreen.svg)](package.json)
-[![Tests: 716 passing](https://img.shields.io/badge/tests-716%20passing-brightgreen.svg)](tests/)
+[![Tests: 872 passing](https://img.shields.io/badge/tests-872%20passing-brightgreen.svg)](tests/)
 
 Prompt injection detection (incl. unicode-tag / leetspeak / typoglycemia / letter-splitting / multilingual evasion) · Indirect-injection (RAG / tool-desc / tool-output / memory / web) · Output scanning (SQL / shell / XSS / secret leak) · PII protection · Trust-tier context streams · Multi-agent trust propagation · Dual-LLM privilege separation · Memory poisoning detection · Tool policy enforcement · Circuit breakers · Async LLM-judge · Cost tracking · Audit logging
 
@@ -60,13 +60,13 @@ From a small studio in Palma de Mallorca.
 - PII leaks through LLMs are a GDPR liability
 - Cost overruns from compromised agents are real
 
-AI Shield runs in-process (not as a proxy), adds <25ms latency, and works with any LLM provider.
+AI Shield runs in-process. Latency depends on input size, enabled scanners and the runtime; measure the configured pipeline with representative inputs.
 
 ---
 
 ## Limitations
 
-- **Three detection layers, all optional past the first.** The heuristic chain is pattern-based (40+ regex with score accumulation) — fast and deterministic, but creative or novel phrasings may bypass it. For semantic coverage, compose the optional ONNX DeBERTa classifier (`ai-shield-classifier-onnx`) and/or the async LLM-judge (`createAsyncJudge`) on top.
+- **Three detection layers, all optional past the first.** The heuristic chain is pattern-based (built-in regex with score accumulation). Matching is deterministic, but creative or novel phrasings may bypass it. For semantic coverage, compose the optional ONNX DeBERTa classifier (`ai-shield-classifier-onnx`) and/or the async LLM-judge (`createAsyncJudge`) on top.
 - **Token estimation is approximate.** The SDK wrappers estimate input tokens as `length * 0.75` for pre-flight budget checks. Actual token counts from the LLM response are used for cost recording.
 - **Output scanning targets injection + leakage, not quality.** `scanOutput()` (v0.3) covers OWASP LLM05 (SQL/shell/XSS/template payloads), secret leaks, system-prompt leaks and output-side PII. Output *quality* — toxicity, hallucination, bias — still requires additional tooling.
 - **Custom patterns are limited to the `instruction_override` category.** Custom regex patterns added via `injection.customPatterns` are all assigned to the `instruction_override` category with a fixed weight of 0.25.
@@ -83,7 +83,7 @@ Pattern-based input filters belong to a class of defenses that recent research h
 **What this means for AI Shield users:**
 
 - **The Heuristic Scanner blocks known attack patterns.** It will not catch a novel obfuscation, a polymorphic phrasing, a foreign-language paraphrase, or an attack hidden inside a long document the agent is asked to summarize.
-- **Indirect injection is the bigger risk.** Over 55% of prompt injection incidents observed in 2026 enterprise deployments arrive through trusted-looking data channels (scraped pages, PDFs, tool outputs, agent-to-agent messages) — not the user prompt. AI Shield scans the user input. It does not deeply inspect every retrieved document the agent ingests downstream.
+- **Indirect injection also arrives through data.** AI Shield scans user input and supported textual tool results in the SDK adapters. Retrieved documents outside those adapter paths still require an explicit scan before use.
 - **Multi-agent contagion is real.** When one agent's output becomes another agent's input, a successful injection propagates. AI Shield does not enforce trust boundaries between cooperating agents.
 
 ### What is actually defensible
@@ -100,7 +100,7 @@ Inside AI Shield, the parts of the library that align with this model are:
 | **Canary Tokens** | Detection signal — flags that an attack succeeded, even if it didn't prevent it. |
 | **Audit Logging** | Forensic. Lets you reconstruct what happened after the fact. |
 
-The parts of AI Shield that follow the *language-level* defense model — Heuristic Scanner, PII pre-scan, output filters in the streaming wrappers — are useful **as a first line of triage** (cheap, fast, blocks the obvious 40+ patterns) but should never be the only line. Treat them like a spam filter, not a firewall.
+The heuristic scanner, PII pre-scan and streaming output filters help triage known patterns. They cannot serve as the only boundary for agent permissions or data access.
 
 ### Recommendation
 
@@ -123,11 +123,11 @@ AI Shield is a useful *component* of that architecture. It is not, by itself, th
 User Input → [AI Shield Scanner Chain] → LLM Provider
                     │
           ┌─────────────────┐
-          │  Scanner Chain   │  Total: <25ms
-          │  1. Heuristics   │  <1ms  (40+ regex patterns)
-          │  2. PII Detect   │  <5ms  (DE/EU patterns + validators)
-          │  3. Tool Policy  │  <1ms  (permission matrix)
-          │  4. Cost Check   │  <1ms  (budget enforcement)
+          │  Scanner Chain   │  Measure for your workload
+          │  1. Heuristics   │  Pattern scoring
+          │  2. PII Detect   │  Patterns + validators
+          │  3. Tool Policy  │  Permission matrix
+          │  4. Cost Check   │  Budget enforcement
           └─────────────────┘
                     │
           ┌─────────────────┐
@@ -142,6 +142,7 @@ User Input → [AI Shield Scanner Chain] → LLM Provider
 | Package | Description |
 |---------|-------------|
 | `ai-shield-core` | Scanner chain, PII, injection detection, tool policy, cost tracking, audit |
+| `ai-shield-classifier-onnx` | Optional ONNX classifier adapter |
 | `ai-shield-openai` | Drop-in wrapper for OpenAI SDK |
 | `ai-shield-anthropic` | Drop-in wrapper for Anthropic SDK |
 | `ai-shield-gemini` | Drop-in wrapper for Google Gemini SDK (deprecated `@google/generative-ai`) |
@@ -324,7 +325,9 @@ console.log(stream.shieldResult);  // { input, output }
 
 ### Level 2f: Vercel AI SDK (middleware)
 
-Works with any AI SDK provider via `wrapLanguageModel` (`ai` >= 7). The input
+Source workspace only: `ai-shield-ai-sdk` has not been published to npm. These examples use the 0.5.2 workspace. Clone this repository, run `npm ci` and `npm run build` at the root, then use the local package.
+
+Requires Node.js 22 or newer, matching the AI 7/provider 4 engine floor. The adapter declares @types/json-schema for its public provider declarations; consumers do not need a manual type-dependency repair. Works with AI SDK providers via `wrapLanguageModel` (`ai` >= 7, <8). The input
 scan runs in `transformParams` BEFORE the provider is called — a `block`
 decision throws `ShieldBlockError` and the model is never invoked, PII masking
 rewrites the outgoing prompt. Optional output scanning attaches its findings
@@ -359,10 +362,12 @@ const model = shieldModel(openai("gpt-4o"), { outputScan: true });
 
 ### Level 2g: Google Gen AI Wrapper (new `@google/genai` SDK)
 
+Source workspace only: `ai-shield-google-genai` has not been published to npm. These examples use the 0.5.2 workspace, built with `npm ci` and `npm run build` at the repository root.
+
 For the new unified Google Gen AI SDK (`@google/genai` — Gemini Developer API
 and Vertex AI, supersedes the deprecated `@google/generative-ai` covered by
 Level 2d/2e). Same call shape as the raw client — the model is passed per
-call, and `response.text` is an accessor property in this SDK:
+call, and `response.text` is an accessor property in this SDK. The adapter declares `@modelcontextprotocol/sdk ^1.32.2` because the Google SDK public types import it even though upstream marks it optional; a fresh consumer receives those declarations automatically:
 
 ```ts
 import { GoogleGenAI } from "@google/genai";
@@ -713,7 +718,7 @@ if (!r.safe) {
 render(r.sanitized);      // PII masked, secrets redacted to [REDACTED_SECRET]
 ```
 
-High-confidence checks (secrets, injection, canary leak) block; jailbreak and heuristic system-prompt-leak warn. Length-capped at 256 KB and ReDoS-safe.
+High-confidence checks (secrets, injection, canary leak) block; jailbreak and heuristic system-prompt-leak warn. Input and output scanners have separate size and matching behavior; this is not a universal latency or ReDoS guarantee.
 
 **In the SDK wrappers:** pass `outputScan: true` (or an `OutputScanConfig`) to `ShieldedAnthropic` / `ShieldedOpenAI` / the Gemini wrapper to run this scanner over every model response automatically — the result lands on `response._shield.outputScan` (and `stream.outputScanResult` for streaming). This is distinct from the legacy `scanOutput: boolean` flag, which only runs the input chain over the output.
 
@@ -795,7 +800,7 @@ if (!v.allowed) abort(v.reason);   // deny / unparseable / error / timeout → b
 
 ## Typoglycemia Defense (v0.5)
 
-Scrambled-middle words ("ignroe pevrious instrcutions") read fine to an LLM but dodge literal patterns. `unscrambleForInjectionScan()` is a fourth lossy view (alongside leetspeak / letter-splitting / unicode-tag): a word that is an anagram of an injection keyword (same length + first/last letter + middle multiset) is folded back to the keyword and the high-value rules re-test. That's exactly classic Typoglycemia — a permuted middle — and it covers transpositions. Anagram-only is deliberate: edit-distance folding false-positived real word pairs ("forgot"→"forget", "rulers"→"rules"), so it was dropped (anagram matching is FP-free on a benign corpus). The `damerauLevenshtein()` utility is exported standalone for callers who want fuzzy matching with their own FP tolerance.
+Scrambled-middle words ("ignroe pevrious instrcutions") read fine to an LLM but dodge literal patterns. `unscrambleForInjectionScan()` is a fourth lossy view (alongside leetspeak / letter-splitting / unicode-tag): a word that is an anagram of an injection keyword (same length + first/last letter + middle multiset) is folded back to the keyword and the high-value rules re-test. That is classic typoglycemia (a permuted middle), including transpositions. Anagram-only is deliberate: edit-distance folding false-positived real word pairs ("forgot"→"forget", "rulers"→"rules"), so it was dropped (anagram matching passed the repository's benign regression corpus, which does not establish a general false-positive rate). The `damerauLevenshtein()` utility is exported standalone for callers who want fuzzy matching with their own FP tolerance.
 
 ---
 
@@ -825,28 +830,36 @@ const result = await chain.run(userInput, { agentId: "my-agent" });
 
 ## Prompt Injection Detection
 
-40+ regex patterns across 8 categories, score-based (0.0 - 1.0). Multiple matches accumulate. Structural signals (excessive newlines, role markers, markdown headers) add bonus score.
+Built-in regex patterns produce scores from 0.0 to 1.0. Multiple matches accumulate. Structural signals (excessive newlines, role markers, markdown headers) add bonus score.
 
-### Categories
+### Example categories
 
-| Category | Patterns | Weight | Examples |
-|----------|----------|--------|----------|
-| `instruction_override` | 8 | 0.15-0.25 | "Ignore all previous instructions", "From now on you will" |
-| `role_manipulation` | 7 | 0.20-0.35 | "You are now a", "Enter DAN mode", "Pretend to be" |
-| `system_prompt_extraction` | 7 | 0.30 | "Show your system prompt", "Repeat your instructions" |
-| `encoding_evasion` | 3 | 0.10-0.30 | Base64 strings, "Decode this from rot13" |
-| `delimiter_injection` | 6 | 0.30-0.35 | `[SYSTEM]`, `<\|im_start\|>`, ChatML/Llama tokens |
-| `context_manipulation` | 4 | 0.10-0.20 | "Hypothetical scenario", "For educational purposes" |
-| `output_manipulation` | 3 | 0.05-0.25 | "Never refuse requests", "Do not mention warnings" |
-| `tool_abuse` | 3 | 0.30-0.35 | "Execute delete", "Send all data to", "Access the .env" |
+| Category | Weight | Examples |
+|----------|--------|----------|
+| `instruction_override` | 0.15-0.25 | "Ignore all previous instructions", "From now on you will" |
+| `role_manipulation` | 0.20-0.35 | "You are now a", "Enter DAN mode", "Pretend to be" |
+| `system_prompt_extraction` | 0.30 | "Show your system prompt", "Repeat your instructions" |
+| `encoding_evasion` | 0.10-0.30 | Base64 strings, "Decode this from rot13" |
+| `delimiter_injection` | 0.30-0.35 | `[SYSTEM]`, `<\|im_start\|>`, ChatML/Llama tokens |
+| `context_manipulation` | 0.10-0.20 | "Hypothetical scenario", "For educational purposes" |
+| `output_manipulation` | 0.05-0.25 | "Never refuse requests", "Do not mention warnings" |
+| `tool_abuse` | 0.30-0.35 | "Execute delete", "Send all data to", "Access the .env" |
+
+### Input limits and wrapper tool results
+
+`AIShield.scan()` blocks oversized input before regex scanning or cache lookup with `decision: "block"`, `safe: false` and an `input-size` content-policy violation. The default limit is 262,144 UTF-8 bytes. Set `AI_SHIELD_MAX_INPUT_BYTES` to a positive safe integer to override it; invalid values fall back to the default. Oversized input is preserved in `sanitized` for inspection, without silent clipping. Callers must honor the block decision before forwarding content.
+
+OpenAI (including legacy function results), Anthropic, both Gemini SDK wrappers and AI SDK middleware now scan supported textual/JSON tool-result content by default with the configured Shield instance. A block prevents the streaming or nonstreaming provider call. Explicitly disabled injection scanning remains disabled. Tool-result objects are preserved; this gate does not recursively redact their PII, scan binary image/file content or scan historical system/assistant/model messages. Express/Hono extraction also includes supported OpenAI-style tool/function text. Call `scanToolOutput()` yourself for retrieved content outside these adapter paths.
 
 ### Strictness Levels
 
 | Level | Threshold | Use Case |
 |-------|-----------|----------|
 | `low` | 0.50 | Internal tools, trusted users |
-| `medium` | 0.30 | Default — balanced |
+| `medium` | 0.30 | Explicit medium setting |
 | `high` | 0.15 | Public chatbots, untrusted input |
+
+An explicit `injection.threshold` takes precedence over explicit `injection.strictness`; explicit strictness takes precedence over the preset threshold. When neither is supplied, preset thresholds remain `public_website: 0.25`, `internal_support: 0.35` and `ops_agent: 0.50`. Explicit `medium` uses 0.30, including with the public preset.
 
 ### Custom Patterns
 
@@ -1173,7 +1186,7 @@ ai-shield/
 │   │       ├── types.ts       All shared types
 │   │       ├── scanner/
 │   │       │   ├── chain.ts       Scanner chain orchestrator
-│   │       │   ├── heuristic.ts   Prompt injection detection (40+ patterns)
+│   │       │   ├── heuristic.ts   Prompt injection detection (built-in patterns)
 │   │       │   ├── pii.ts        PII detection (DE/EU-first)
 │   │       │   └── canary.ts     Canary token injection
 │   │       ├── policy/
@@ -1210,10 +1223,10 @@ ai-shield/
 │           ├── express.ts     Express middleware
 │           └── hono.ts        Hono middleware
 │
-├── tests/                     44 files · 716 cases (vitest)
+├── tests/                     50 files · 872 cases (vitest)
 │   ├── unit/                  scanners, policy, cost, wrappers, middleware
 │   ├── integration/           defense-in-depth + full-pipeline
-│   └── corpus/                labelled attack / benign harness (0% FP bar)
+│   └── corpus/                labelled attack / benign regression harness
 │
 ├── package.json               Monorepo root (npm workspaces)
 ├── tsconfig.json              Strict TypeScript
@@ -1225,29 +1238,38 @@ ai-shield/
 ## Tests
 
 ```bash
-npm test            # 716 tests across 44 files, ~1.3s
+npm test                       # 872 tests / 50 files in the Node 22 full suite
+npm run bench:redos             # repeated-trigger growth regression
+npm run bench:coverage          # labeled limitation probes
+npm run test:package-exports    # all eight packed entrypoints
+npm run test:openai-peers        # includes the declared SDK 4.0.0 floor
+npm run test:anthropic-peers     # actual Anthropic clients and JSON/SSE
+npm run test:gemini-peers        # actual legacy Gemini clients and JSON/SSE
+npm run test:new-sdk-peers       # AI SDK and Google Gen AI on Node 22
+npm run test:new-sdk-peers -- google-genai # GenAI-only gate on Node 20
 ```
 
-Counts below are grouped by area and sum to the full suite; run `npm test` for
-the authoritative number.
+Version 0.5.2 passed 24 local release checks, including the 872-test Node 22 full suite and 804 tests across 48 files in the supported Node 20 scope. Two files importing AI7 are excluded from that Node 20 scope; the AI SDK adapter requires Node 22. All eight exact package archives pass entrypoint, strict-type and local runtime checks and contain the complete root MIT license. Root and fresh combined-consumer audits report zero findings. ONNX was exercised with its injected session/tokenizer; native inference was outside these checks.
 
-| Area | Tests | Covers |
-|------|------:|--------|
-| Injection detection (heuristic + evasion views + corpus) | 139 | 40+ patterns, unicode-tag / homoglyph / zero-width / leetspeak / letter-splitting / typoglycemia / policy-puppetry, structural signals, attack-corpus harness (0% FP bar) |
-| Indirect injection (RAG / tool-desc / tool-output / memory / web / agent) | 60 | Source-profiled `scanIngested`, `scanToolOutput`, multi-agent `propagateTrust` contagion |
-| Trust-tier context + dual-LLM | 42 | `wrapContext` / `assemblePrompt` fencing, `createDualLLM` privilege separation, action screening |
-| Memory canary (persistence poisoning) | 44 | Mint / verify / rotate, tenant-mismatch, sentinel honeypots, bulk sweep |
-| Circuit breakers (runtime tool guard) | 40 | Rate limit, blast-radius cap, trip + cooldown, HITL hook, LRU key eviction |
-| PII detection | 48 | IBAN (mod-97) / credit card (Luhn) / email / phone / tax ID / IP / URL, masking, overlap dedup, 40+ IBAN countries |
-| SDK wrappers (OpenAI / Anthropic / Gemini incl. streaming) | 57 | Clean/injection/PII paths, pre-stream blocking, cost recording, output scan, callbacks |
-| Shield core / chain / cache / singleton | 80 | Config + presets, escalation + early-exit, LRU cache, singleton reuse, input-size guard, v0.3 review-fix regressions |
-| Cost tracking + anomaly | 31 | Budget checks, pricing table, z-score anomaly, records ring-buffer cap |
-| ML classifier (optional ONNX) | 31 | `Scanner` interface, hermetic mock runtime + tokenizer, graceful-degrade |
-| Output scanning (v0.3) | 21 | Secret leak / SQL-shell-XSS / system-prompt leak / jailbreak / output-side PII |
-| Middleware (Express / Hono) | 31 | Input extraction, blocked-response format, skip paths, context injection |
-| Policy + tool manifest | 28 | 3 presets, allow/deny wildcards, SHA-256 manifest pin/drift |
-| Integration (defense-in-depth + full pipeline) | 34 | End-to-end v0.2 layering + preset combos |
-| Audit / canary / async-judge | 30 | SHA-256 hashing + batching, system-prompt canary, off-hot-path judge verdicts |
+The isolated packed-consumer matrix contains 22 SDK/version/Node cases with strict:true and skipLibCheck:false:
+
+| SDK | Versions checked | Node versions |
+|---|---|---|
+| OpenAI | 4.0.0, 4.104.0, 6.49.0 | 20, 22 |
+| Anthropic | 0.30.0, 0.135.0, 0.137.0 | 20, 22 |
+| Legacy Gemini | 0.15.0, 0.24.1 | 20, 22 |
+| Google Gen AI | 2.0.0, 2.32.0 | 20, 22 |
+| AI SDK | 7.0.0, 7.0.159 | 22 |
+
+These checks use real SDK constructors, native request types and JSON/SSE paths with local fetch stubs or the official AI test provider. Tool-result rejection happens before the provider call. Anthropic toolsets without a name remain intact in the forwarded payload and are omitted only from the named-tool scan context. Legacy Gemini's compatibility fix changes declarations while leaving its generated runtime JavaScript unchanged. The table records finite tested versions; it does not certify every version admitted by a peer range. Existing external peers/engines remain unchanged, including the AI adapter's Node 22 floor.
+
+Separate real HTTP application checks pass 12 framework/Node cases and 36 short benign requests: Express 4.0.0/4.22.3/5.0.0/5.3.0 and Hono 4.0.0/4.13.16 on Node 20/22. Strict typing passes for those Express versions and Hono 4.13.16. Hono 4.0.0 has the same duplicate render declaration under TypeScript 5.9.3 with strict:true and skipLibCheck:false in a minimal upstream-only app; no Hono 4.0 strict-clean claim or peer-floor increase follows. Middleware attaches its sanitized result; it preserves the original body, so applications must use that result when redaction is needed.
+
+The existing attack corpus has 24 attack and 17 benign cases. It is a repository regression self-check, not an independent benchmark. The separate coverage command checks 12 attack and 12 benign limitation probes per setting. In the checked default run it blocked 5/12 attacks and 2/12 benign cases. High strictness blocked 5/12 attacks, flagged one more as a warning and still blocked 2/12 benign cases. These results expose known gaps; they do not estimate general detection or false-positive rates.
+
+Known misses include encoded content (base64, hex and rot13), some languages, paraphrases and separator variants. Security questions and quoted attack fixtures can be false positives. Each scan examines one input; combining an attack across messages is outside this per-input heuristic check. Keep authorization and tool permissions independent of the detector.
+
+The ROLE-007 regression benchmark warms up the actual scanner and compares median scan time at 80, 160 and 240 KB. The checked Node 20/22 runs grew about 3.05/3.07 times from 80 to 240 KB; restoring the old expression failed the growth gate. This measures that specific repeated-trigger regression, not every possible regular-expression input.
 
 ---
 
@@ -1264,6 +1286,8 @@ Minimal by design. Core has zero runtime dependencies. Optional peer deps for Re
 | `@google/generative-ai` | Peer dep of `ai-shield-gemini` | Gemini SDK wrapper (deprecated SDK) |
 | `@google/genai` (>= 2) | Peer dep of `ai-shield-google-genai` | Google Gen AI SDK wrapper (new unified SDK) |
 | `ai` (>= 7) | Peer dep of `ai-shield-ai-sdk` | Vercel AI SDK middleware |
+| `@types/json-schema` | Dependency of `ai-shield-ai-sdk` | Public provider declarations |
+| `@modelcontextprotocol/sdk` (^1.32.2) | Dependency of `ai-shield-google-genai` | Types imported by the Google SDK |
 | `express` | Peer dep of `ai-shield-middleware` | Express middleware |
 | `hono` | Peer dep of `ai-shield-middleware` | Hono middleware |
 
@@ -1276,7 +1300,7 @@ Minimal by design. Core has zero runtime dependencies. Optional peer deps for Re
 - [x] **Vercel AI SDK middleware** (`ai-shield-ai-sdk`) — `wrapLanguageModel` integration for `ai` >= 7: input scan in `transformParams` (block / warn / PII-mask before the provider call), optional output scanning surfaced via `providerMetadata.aiShield` on generate results and `finish` stream parts
 - [x] **`@google/genai` wrapper** (`ai-shield-google-genai`) — the new unified Google Gen AI SDK (supersedes `@google/generative-ai`): input scan / block / PII-mask before `ai.models.generateContent` and `generateContentStream`, optional output scanning in `_shield` / `shieldResult`, per-call model cost tracking
 
-### Shipped in v0.5.0 (this release)
+### Shipped in v0.5.0
 
 - [x] **Typoglycemia defense** (`unscrambleForInjectionScan` + `damerauLevenshtein`) — un-scrambles "ignroe pevrious instrcutions" via anagram-middle or single-edit fuzzy match, first+last gate keeps benign prose clean
 - [x] **Dual-LLM privilege separation** (`createDualLLM`) — privileged (tools) model never reads raw untrusted content; quarantined (no-tools) model processes it, results scanned + fenced, unsafe results dropped
@@ -1288,7 +1312,7 @@ Minimal by design. Core has zero runtime dependencies. Optional peer deps for Re
 - [x] **Multilingual override detection** (DE/ES/FR `localized_override` category)
 - [x] **Policy-puppetry / fake-config detection** (HiddenLayer 2025 — DELIM-PP-1..5)
 - [x] **Leetspeak detection** (`leetDecodeForInjectionScan` lossy view)
-- [x] **Attack-corpus harness** (100% detection / 0% false-positive bar) + 2 bug fixes + 3 FP fixes
+- [x] **Attack-corpus regression harness** with labeled attack and benign examples; broader limitation probes report misses and false positives
 
 ### Shipped in v0.3.0
 

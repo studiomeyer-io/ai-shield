@@ -193,7 +193,37 @@ export function aiShieldMiddleware(
       const context = buildContext(params);
       const userText = extractUserText(params.prompt);
 
-      const inputResult = await shieldInstance.scan(userText, context);
+      let inputResult = await shieldInstance.scan(userText, context);
+      const toolText = extractToolText(params.prompt);
+      if (inputResult.decision !== "block" && toolText) {
+        const toolResult = await shieldInstance.scan(toolText, {
+          ...context,
+          source: "tool-output",
+        });
+        inputResult = {
+          ...inputResult,
+          safe: inputResult.safe && toolResult.safe,
+          decision:
+            toolResult.decision === "block"
+              ? "block"
+              : inputResult.decision === "warn" ||
+                  toolResult.decision === "warn"
+                ? "warn"
+                : "allow",
+          violations: [...inputResult.violations, ...toolResult.violations],
+          meta: {
+            scanDurationMs:
+              inputResult.meta.scanDurationMs + toolResult.meta.scanDurationMs,
+            scannersRun: [
+              ...new Set([
+                ...inputResult.meta.scannersRun,
+                ...toolResult.meta.scannersRun,
+              ]),
+            ],
+            cached: inputResult.meta.cached && toolResult.meta.cached,
+          },
+        };
+      }
 
       if (inputResult.decision === "block") {
         config.onBlocked?.(inputResult, params.prompt);
@@ -295,6 +325,38 @@ function extractUserText(prompt: ShieldPrompt): string {
   }
 
   return parts.join("\n");
+}
+
+/** Extract tool-result text and JSON, excluding binary file data. */
+function extractToolText(prompt: ShieldPrompt): string {
+  const text: string[] = [];
+  for (const message of prompt) {
+    if (message.role !== "tool") continue;
+    for (const part of message.content) {
+      if (part.type !== "tool-result") continue;
+      const output = part.output;
+      switch (output.type) {
+        case "text":
+        case "error-text":
+          text.push(output.value);
+          break;
+        case "json":
+        case "error-json":
+          text.push(JSON.stringify(output.value));
+          break;
+        case "execution-denied":
+          if (output.reason) text.push(output.reason);
+          break;
+        case "content":
+          for (const item of output.value) {
+            if (item.type === "text") text.push(item.text);
+            if (item.type === "file" && item.data.type === "text")
+              text.push(item.data.text);
+          }
+      }
+    }
+  }
+  return text.join("\n");
 }
 
 /** Replace user message text with the sanitized version */
