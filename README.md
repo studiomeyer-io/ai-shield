@@ -139,18 +139,18 @@ User Input → [AI Shield Scanner Chain] → LLM Provider
 
 ### Packages
 
-| Package | Description |
-|---------|-------------|
-| `ai-shield-core` | Scanner chain, PII, injection detection, tool policy, cost tracking, audit |
-| `ai-shield-classifier-onnx` | Optional ONNX classifier adapter |
-| `ai-shield-openai` | Drop-in wrapper for OpenAI SDK |
-| `ai-shield-anthropic` | Drop-in wrapper for Anthropic SDK |
-| `ai-shield-gemini` | Drop-in wrapper for Google Gemini SDK (deprecated `@google/generative-ai`) |
-| `ai-shield-google-genai` ⚠️ | Drop-in wrapper for the new unified Google Gen AI SDK (`@google/genai`) |
-| `ai-shield-ai-sdk` ⚠️ | Middleware for the Vercel AI SDK (`wrapLanguageModel`) |
-| `ai-shield-middleware` | Express and Hono middleware |
+All eight packages below are available on npm at version 0.5.2.
 
-⚠️ **Not published to npm yet.** `ai-shield-google-genai` and `ai-shield-ai-sdk` live in this repository and are built from source, but they are not on the npm registry — `npm install` will return a 404. Use them via a workspace checkout until the first release; every other package in the table installs normally.
+| Package | Version | Description |
+|---|---|---|
+| `ai-shield-core` | `0.5.2` | Scanner chain, PII, injection detection, tool policy, cost tracking, audit |
+| `ai-shield-classifier-onnx` | `0.5.2` | Optional ONNX classifier adapter |
+| `ai-shield-openai` | `0.5.2` | Drop-in wrapper for OpenAI SDK |
+| `ai-shield-anthropic` | `0.5.2` | Drop-in wrapper for Anthropic SDK |
+| `ai-shield-gemini` | `0.5.2` | Drop-in wrapper for Google Gemini SDK (deprecated `@google/generative-ai`) |
+| `ai-shield-google-genai` | `0.5.2` | Drop-in wrapper for the new unified Google Gen AI SDK (`@google/genai`) |
+| `ai-shield-ai-sdk` | `0.5.2` | Middleware for the Vercel AI SDK (`wrapLanguageModel`) |
+| `ai-shield-middleware` | `0.5.2` | Express and Hono middleware |
 
 ---
 
@@ -325,7 +325,7 @@ console.log(stream.shieldResult);  // { input, output }
 
 ### Level 2f: Vercel AI SDK (middleware)
 
-Source workspace only: `ai-shield-ai-sdk` has not been published to npm. These examples use the 0.5.2 workspace. Clone this repository, run `npm ci` and `npm run build` at the root, then use the local package.
+Install `ai-shield-ai-sdk@0.5.2` with the `ai` 7 peer. Node.js 22 or newer is required.
 
 Requires Node.js 22 or newer, matching the AI 7/provider 4 engine floor. The adapter declares @types/json-schema for its public provider declarations; consumers do not need a manual type-dependency repair. Works with AI SDK providers via `wrapLanguageModel` (`ai` >= 7, <8). The input
 scan runs in `transformParams` BEFORE the provider is called — a `block`
@@ -362,7 +362,7 @@ const model = shieldModel(openai("gpt-4o"), { outputScan: true });
 
 ### Level 2g: Google Gen AI Wrapper (new `@google/genai` SDK)
 
-Source workspace only: `ai-shield-google-genai` has not been published to npm. These examples use the 0.5.2 workspace, built with `npm ci` and `npm run build` at the repository root.
+Install `ai-shield-google-genai@0.5.2` with the `@google/genai` 2 peer.
 
 For the new unified Google Gen AI SDK (`@google/genai` — Gemini Developer API
 and Vertex AI, supersedes the deprecated `@google/generative-ai` covered by
